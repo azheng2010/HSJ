@@ -9,12 +9,12 @@
                 "mitm_test.py",
                 "models.py",
                 "update.py",
-              ]
+              ],
   "folders" : [
                 "audio",
                 "conf",
                 "data",
                 "log",
                 "runtxt",
-              ]
+              ],
 }
