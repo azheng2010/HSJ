@@ -1,6 +1,7 @@
 #！/usr/bin/env python3
 # -*- coding: utf-8 -*-
 import pymysql
+from comm import load_data_only,tk_col
 class MYDB():
     def __init__(self,user, passwd, db_name, host='localhost', port=3306, charset='utf8'):
         self.db_name=db_name
@@ -8,16 +9,25 @@ class MYDB():
                                   db=db_name,charset=charset)
         self.cursor = self.db.cursor()
         self.cursor.execute("SELECT VERSION()")
+        self.addnum=0
+        self.modifynum=0
         data = self.cursor.fetchone()
         print("Database version : %s " % data)
     def create_table(self,table_name,field=None,mode='w'):
         self.cursor.execute("DROP TABLE IF EXISTS %s"%table_name)
         sql = """CREATE TABLE {tablename} (
-                 FIRST_NAME  CHAR(20) NOT NULL,
-                 LAST_NAME  CHAR(20),
-                 AGE INT,
-                 SEX CHAR(1),
-                 INCOME FLOAT )""".format(tablename=table_name)
+              'qid' int(10) unsigned NOT NULL AUTO_INCREMENT COMMENT '题目id，不为空，自增，唯一性',
+              'stem' text,
+              'options' text,
+              'answer_txt' text,
+              'answer_symbol' char(30) DEFAULT NULL,
+              'qtype' char(20) DEFAULT NULL,
+              'company' char(255) DEFAULT NULL COMMENT '医院单位',
+              'origin' char(255) DEFAULT NULL COMMENT '题目来源',
+              'mark' text COMMENT '分类标签',
+              PRIMARY KEY ('qid')
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+            """.format(tablename=table_name)
         self.cursor.execute(sql)
     def pre_data(self,data_list):
         new_list=[]
@@ -44,6 +54,8 @@ class MYDB():
         try:
             self.cursor.execute(sql)
             self.db.commit()
+            self.addnum+=1
+            print('共成功增加一条记录：',self.addnum)
         except:
             self.db.rollback()
             print('Error: %s 语句未能成功执行！'%sql)
@@ -113,28 +125,41 @@ class MYDB():
         except :
             self.db.rollback()
             print('Error: %s 语句未能成功执行！'%sql)
-    def query(self,table_name,query_keyword,all_display=True,col_list=None):
-        if (not all_display) and col_list:
-            sql = "SELECT {cols} FROM {tablename} WHERE {queryword}".format(
-                    cols=','.join(col_list),
-                    tablename=table_name,
-                    queryword=query_keyword)
+    def query(self,table_name,query_keyword=None,col_list=None,display=False):
+        if query_keyword is None:
+            where_txt=''
         else:
-            sql = "SELECT * FROM {tablename} WHERE {queryword}".format(
-                    tablename=table_name,
-                    queryword=query_keyword)
+            where_txt='WHERE {queryword}'.format(queryword=query_keyword)
+        if col_list is None:
+            col_list=self.list_col_table(table_name)
+            select_txt='*'
+        else:
+            select_txt=','.join(col_list)
+        sql = "SELECT {cols} FROM {tablename} {where_cmd}".format(
+                cols=select_txt,
+                tablename=table_name,
+                where_cmd=where_txt)
         try:
             self.cursor.execute(sql)
             results = self.cursor.fetchall()
             if results is None:
                 print("查询结果为空")
+                lst=None
             else:
-                for row in results:
-                    print(row)
-            print('-'*20)
-            print('共查询到 %s个结果！\n'%len(results))
+                lst=[]
+                for i,row in enumerate(results):
+                    dic=dict(zip(col_list,row))
+                    lst.append(dic)
+                    if display:
+                        print(i+1,dic)
+                        print('-'*10)
+            if display:
+                print('共查询到 %s个结果！\n'%len(results))
+            return lst
         except:
             print("Error: unable to fetch data")
+            results=None
+            return results
     def update_data(self,table_name,setdata,condition):
         if setdata:
             set_sql='SET %s'%setdata
@@ -151,6 +176,8 @@ class MYDB():
         try:
             self.cursor.execute(sql)
             self.db.commit()
+            self.modifynum+=1
+            print(self.modifynum,'成功修改一条记录：',where_sql)
         except:
             self.db.rollback()
             print('Error: %s 语句未能成功执行！'%sql)
@@ -177,6 +204,10 @@ class MYDB():
         except:
             self.db.rollback()
             print('Error: %s 语句未能成功执行！'%sql)
+    def count_datas(self,table_name):
+        self.cursor.execute("select count(stem) from %s"%table_name)
+        one=self.cursor.fetchone()
+        return one[0]
     def list_col_table(self,table_name):
         self.cursor.execute("select * from %s limit 1"%table_name)
         col_name_list = [tuple[0] for tuple in self.cursor.description]
@@ -191,11 +222,57 @@ class MYDB():
         print('cursor对象关闭!')
         self.db.close()
         print('关闭db连接!')
-if __name__=='__main__':
-    mydb=MYDB('root','mysql','hsj_tiku')
-    col_list=mydb.list_col_table('tiku')[1:]
-    print(col_list)
-    data=[None, 650375, '组成护理程序框架的理论是：', 'A.人的基本需要论', 'B.一般系统论', 'C.方法论', 'D.信息交流论', 'E.解决问题论', '', '', '', 'B', '中公医考题APP', '单选A1', '护士资格', '在众多相关理论中，一般系统论构成了护理程序的基本框架，是护理程序的步骤及内涵的核心。']
-    mydb.insert_many_data2('tiku',col_list,[data,data,data])
+def make_set_data_txt(cols,result,dic):
+    lst=[]
+    for col in cols:
+        if result[col] is None:
+            set_txt="%s='%s'"%(col,dic[col])
+        elif dic[col] not in result[col]:
+            set_txt="%s='%s|%s'"%(col,result[col],dic[col])
+        else:
+            set_txt=None
+        if set_txt:lst.append(set_txt)
+    return ' , '.join(lst)
+def add_data_to_db(datafilename,origin,company):
+    mydb=MYDB('root','mysql2019','hsj')
+    col_list=mydb.list_col_table('tiku')
+    col_list=col_list[1:]
+    qids,questions=load_data_only(datafilename)
+    qtotal=len(questions)
+    for i,q in enumerate(questions):
+        print('正在处理[%s/%s]'%(i+1,qtotal))
+        question='\n'.join([q[tk_col['stem']],q[tk_col['options']]])
+        results=mydb.query('tiku',query_keyword="question = '%s'"%question,
+                           col_list=['qid','origin','company','mark'])
+        if results :
+            for r in results:
+                cols=['origin','company','mark']
+                dic={'origin':origin,'company':company,'mark':q[tk_col['mark']]}
+                where_txt='qid = %s'%r['qid']
+                set_txt=make_set_data_txt(cols,r,dic)
+                if set_txt:
+                    mydb.update_data('tiku',set_txt,where_txt)
+        else:
+            record=[]
+            for col in col_list:
+                if col in tk_col.keys():
+                    if type(q[tk_col[col]]) is list:
+                        y='|'.join(q[tk_col[col]])
+                    else:
+                        y=q[tk_col[col]]
+                    record.append(y)
+                else:
+                    if col=='parsing':record.append('')
+                    if col=='question':record.append(question)
+                    if col=='origin':record.append(origin)
+                    if col=='company':record.append(company)
+            mydb.insert_data('tiku',col_list,record)
+    count=mydb.count_datas('tiku')
+    print('当前表中有记录%s条\n本次新增了%s条,修订了%s条'%(count,mydb.addnum,mydb.modifynum))
     mydb.close()
+if __name__=='__main__':
+    origin='AHUAPP'
+    datafilename='阿虎医考护理题库.data'
+    company=''
+    add_data_to_db(datafilename,origin,company)
     pass
