@@ -12,6 +12,7 @@ from comm import base64decode as bde
 from comm import base64encode as be
 from m2m import e2e
 from HSJ_AES import AESCipher
+from myaes import MYAES
 class AnswerRobot:
     def __init__(self, logger):
         self.logger = logger
@@ -456,6 +457,8 @@ class MyWatchDog:
                 else:
                     print('登录失败！')
     def decryptinfo(self, data):
+        parser=MYAES()
+        data=parser.decrypt(data)
         return data
     def check_version(self):
         print('正在检查版本信息……')
@@ -488,6 +491,7 @@ class MyWatchDog:
             if self.user in users:
                 p = users.index(self.user)
                 ts = time.mktime(time.strptime(dates[p], '%Y-%m-%d %H:%M:%S'))
+                print('有效期至%s'%dates[p])
                 if time.time() <= ts:
                     return True
                 print('付费用户已过有效期：%s\n续费请联系[后人乘凉2015]\n微信号:hrcl205' % dates[p])
@@ -501,6 +505,8 @@ class HSJAPP:
         else:self.pwd=user[-6:]
         self.count=0
         self.sessionid=''
+        self.unitname=''
+        self.unitid=''
         self.testunits=[]
         self.qids=[]
         self.questions=[]
@@ -613,6 +619,7 @@ class HSJAPP:
             else:
                 print(j["tip"])
     def get_testunit_questions(self,testunit):
+        unitquestions=[]
         url='http://admin.hushijie.com.cn/testunit/student/answer/start'
         postdata={
                 'testunitid':testunit,
@@ -634,29 +641,50 @@ class HSJAPP:
         if r.status_code==200:
             j=r.json()
             if j["ret"]==1:
+                j["examPaperFullInfo"]["name"]
                 qlst=j["examPaperFullInfo"]["questionRelations"]
                 classification=j["examPaperFullInfo"]["name"]
+                self.unitname=classification
+                self.unitid=testunit
+                self.hospitalid=j["examPaperFullInfo"]["hospitalid"]
                 for x in qlst:
                     qid,stem,answertxt,answer2,options,type_name=parser(x)
                     self.count+=1
+                    stempinyin=str_to_pinyin(stem)
                     if qid not in self.qids:
                         self.qids.append(qid)
-                        stempinyin=str_to_pinyin(stem)
                         self.questions.append([qid,stem,answertxt,stempinyin,answer2,options,type_name,classification])
+                    unitquestions.append([qid,stem,answertxt,stempinyin,answer2,options,type_name,classification])
                     print('已处理%s,当前题库共有%s题'%(self.count,len(self.qids)))
             elif j['tip']=='用户需要登录!':
                 self.login()
             else:
                 print(j["tip"])
+        return unitquestions
     def get_all_questions(self,encrpt=True):
         if self.sessionid=='':self.login()
         self.get_testunitid()
-        for tuid in self.testunits:
+        for i,tuid in enumerate(self.testunits):
             print('正在提取%s的题目……'%tuid[1])
-            self.get_testunit_questions(tuid[0])
+            unitquestions=self.get_testunit_questions(tuid[0])
+            self.write2txt(unitquestions)
             self.savedata(encrpt=encrpt)
-            time.sleep(random.randint(5,15))
+            self.savedata(encrpt=False)
+            time.sleep(random.randint(5,10))
+    def write2txt(self,questions,fn=None):
+        for x in :
+            self.unitname=self.unitname.replace(x,'')
+        txt=self.unitname+'\n'
+        for i,q in enumerate(questions):
+            txt=txt+'\n'+'-'*20
+            txt=txt+'\n'+'\n'.join([str(i+1)+'.'+q[1],q[5],'【答案】'+''.join(q[4]),'【解析】'])
+        timestr = time.strftime('%Y%m%d%H%M%S', time.localtime())
+        if fn is None:
+            fn=txtpath+'%s_%s_%s_%s.txt'%(self.hospitalid,self.unitid,self.unitname,timestr)
+        with open(fn,'w',encoding='utf-8') as f:
+            f.write(txt)
+        print("[%s]已保存！"%(fn))
 if __name__ == '__main__':
-    myapp=HSJAPP('18373759966',pwd='726655555')
-    myapp.get_all_questions(encrpt=False)
+    myapp=HSJAPP('18711631255',pwd='8462584625')
+    myapp.get_all_questions(encrpt=True)
     pass
