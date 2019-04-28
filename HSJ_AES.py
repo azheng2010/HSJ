@@ -19,10 +19,20 @@ class AESCipher:
     def encrypt(self, raw):
         raw2 = self._AESCipher__pad(raw)
         cipher = AES.new(self.key, AES.MODE_CBC, self.iv)
-        return base64.b64encode(cipher.encrypt(raw2))
+        r=base64.b64encode(cipher.encrypt(raw2))
+        return self.base64encode(r.decode()).encode()
     def decrypt(self, enc):
+        enc=self.base64decode(enc)
         enc2 = base64.b64decode(enc)
         cipher = AES.new(self.key, AES.MODE_CBC, self.iv)
         return self._AESCipher__unpad(cipher.decrypt(enc2).decode('utf-8'))
+    def base64encode(self,txt):
+        enb64=base64.b64encode(txt.encode())
+        en64=enb64.decode()
+        return en64
+    def base64decode(self,en64):
+        btxt=base64.b64decode(en64.encode())
+        txt=btxt.decode()
+        return txt
 if __name__ == '__main__':
     pass

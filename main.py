@@ -21,4 +21,5 @@ if __name__=='__main__':
     watchdog=MyWatchDog(user,method,email,rate_min,rate_max)
     watchdog.showlog(fn='HSJ.txt')#显示log
     watchdog.choice()#选择功能
+    #watchdog.login()#登录
     pass
