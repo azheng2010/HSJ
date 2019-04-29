@@ -7,7 +7,7 @@ from fuzzywuzzy import fuzz
 from fuzzywuzzy import process
 from comm import path0, confpath, datapath, txtpath, boxmsg, tk_col
 from comm import read_start_response, symb_options, delete_files
-from comm import parser,parser_login,str_to_pinyin
+from comm import parser,parser_login,str_to_pinyin,version
 from comm import base64decode as bde
 from comm import base64encode as be
 from m2m import e2e
@@ -393,6 +393,8 @@ class MyWatchDog:
         self.conf = configparser.ConfigParser()
         self.conf.read(self.confpathname, encoding='utf-8')
         self.version = self.conf.get('Version', 'version')
+        if self.version != version:
+            self.version = version
         self.DEBUG = self.conf.getint('Work-Mode', 'debug')
         self.UA = self.conf.get('Client', 'uainfo')
         self.saveconfig()
@@ -402,6 +404,7 @@ class MyWatchDog:
         self.conf.set('Correctrate-Setting', 'min', str(self.rate_min))
         self.conf.set('Answer-Method', 'Method', self.method)
         self.conf.set('Notice', 'email', self.email)
+        self.conf.set('Version', 'version',self.version)
         self.conf.write(open(self.confpathname, 'w'))
         if self.DEBUG:
             print(('配置文件{}已保存').format(self.confpathname))
@@ -431,7 +434,7 @@ class MyWatchDog:
                         print('--------------------')
                         print('你选择的是  [4]准备考试')
                         print('--------------------')
-                        self.login()
+                        self.exam_mode()
                     else:
                         print('您的输入错误！')
     def showlog(self, fn=None):
@@ -445,30 +448,31 @@ class MyWatchDog:
             mylog = f.read()
         print(mylog)
     def login(self):
-        print('%s正在连线答题机器人……' % self.user[-4:])
         if self.check_user_date():
-            print('[连线成功]')
-            cmdtxt = ('mitmdump -s {path}mitm_test.py').format(path=path0)
-            if platform.system() == 'Windows':
-                os.system(cmdtxt)
+            self.choice()
+    def exam_mode(self):
+        print('%s正在连线答题机器人……' % self.user[-4:])
+        print('[连线成功]')
+        cmdtxt = ('mitmdump -s {path}mitm_test.py').format(path=path0)
+        if platform.system() == 'Windows':
+            os.system(cmdtxt)
+        else:
+            if platform.system() == 'Linux':
+                Popen(cmdtxt, shell=True)
             else:
-                if platform.system() == 'Linux':
-                    Popen(cmdtxt, shell=True)
-                else:
-                    print('登录失败！')
+                print('登录失败！')
     def decryptinfo(self, data):
         parser=MYAES()
         data=parser.decrypt(data)
         return data
     def check_version(self):
         print('正在检查版本信息……')
-        url = 'https://raw.githubusercontent.com/azheng2010/HSJ/master/version.json'
+        url = 'https://raw.githubusercontent.com/azheng2010/HSJ_server/master/version/the_latest_version.txt'
         r = requests.get(url)
         if r.status_code == 200:
-            txt = self.decryptinfo(r.text)
-            j = json.loads(txt)
-            if j['version'] > self.version:
-                print('当前版本为%s\n最新版本为%s' % (self.version, j['version']))
+            version = r.text.strip()
+            if version > self.version:
+                print('最新版本为%s\n当前版本为%s' % (version,self.version))
                 i = input('是否更新版本？默认更新[Y/n]:')
                 if i.upper() in ('Y', 'YES', ''):
                     update.update()
@@ -478,20 +482,25 @@ class MyWatchDog:
                 else:
                     print('输入错误！')
             else:
-                print('当前版本为最新版本(%s)，无需更新！' % j['version'])
+                print('当前版本为最新版本(%s)，无需更新！' % version)
     def check_user_date(self):
-        url = 'https://raw.githubusercontent.com/azheng2010/HSJ/master/user_info.csv'
+        print('正在验证用户及有效期……')
+        url = 'https://github.com/azheng2010/HSJ_server/raw/master/reg/reg_user.csv'
         r = requests.get(url)
         if r.status_code == 200:
-            txt = self.decryptinfo(r.text)
+            txt = r.text
             reader = csv.reader(txt.strip().split(sep='\n'))
             lst = [x for x in reader]
-            users = [x[2] for x in lst]
-            dates = [x[3] for x in lst]
-            if self.user in users:
-                p = users.index(self.user)
+            users = [x[3] for x in lst]
+            print(users)
+            dates = [x[4] for x in lst]
+            en=MYAES()
+            checkuser=en.encrypt('u'+self.user)
+            print(checkuser)
+            if checkuser in users:
+                p = users.index(checkuser)
                 ts = time.mktime(time.strptime(dates[p], '%Y-%m-%d %H:%M:%S'))
-                print('有效期至%s'%dates[p])
+                print('有效期至 %s'%dates[p])
                 if time.time() <= ts:
                     return True
                 print('付费用户已过有效期：%s\n续费请联系[后人乘凉2015]\n微信号:hrcl205' % dates[p])

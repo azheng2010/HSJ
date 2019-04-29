@@ -10,7 +10,7 @@ class MYAES():
             self.key=self.keep_key(key)
             print(self.key)
         if iv is None:
-            self.iv="AYibBtn$CDNUO&="
+            self.iv="AYibBtn$CDNUO&=h"
         else:
             self.iv=iv
         if mode.upper()=="CBC":
@@ -80,7 +80,7 @@ class MYAES():
         else:
             return text
 if __name__ == '__main__':
-    myaes=MYAES(key='sjhflis;eltja;lksjdf;lkaihwihhriqwpoeiyt;sa;fsn;ds',mode='ecb')
+    myaes=MYAES()
     s='中文测试明文字符串this is a test string'
     e = myaes.encrypt(s)  
     print("加密:", e)

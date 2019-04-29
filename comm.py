@@ -15,6 +15,7 @@ logpath = os.path.join(path0, 'log') + os.path.sep
 audiopath = os.path.join(path0, 'audio') + os.path.sep
 GOODNEWS = 'GOODNEWS.mp3'
 BADNEWS = 'BADNEWS.mp3'
+version='0.1.1'
 tk_col = {'qid':0, 
  'stem':1,  'options':5,  'answer_txt':2, 
  'answer_symbol':4,  'pinyin':3, 

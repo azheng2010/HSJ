@@ -12,7 +12,7 @@ Description : 应用程序主入口
 
 from models import MyWatchDog
 if __name__=='__main__':
-    user='18373759966'#护世界账号,修改时注意单引号要保留
+    user='18711631255'#护世界账号,修改时注意单引号要保留
     pwd='726655555'#护世界登录密码，单引号保留
     method='Auto'#手动答题，下面的正确率设置无效
     email='12345678@qq.com'
@@ -20,6 +20,6 @@ if __name__=='__main__':
     rate_max= 90 #正确率上限 0-100
     watchdog=MyWatchDog(user,method,email,rate_min,rate_max)
     watchdog.showlog(fn='HSJ.txt')#显示log
-    watchdog.choice()#选择功能
-    #watchdog.login()#登录
+    #watchdog.choice()#选择功能
+    watchdog.login()#登录
     pass
