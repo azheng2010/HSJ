@@ -20,16 +20,21 @@ class Hsj_Addon:
         self.answer_lst = None
         self.txt = None
         self.run1st = True 
-        self.read_debug_config()
+        self.read_config()
         self.logger = logger.logger()
         self.mitm_msg_formater = self.read_mitm_msg_formater()
         self.answer_robot = AnswerRobot(self.logger)
-    def read_debug_config(self):
+    def read_config(self):
         self.conf = ConfigParser()
         self.conf.read(confpath + 'default.ini', encoding='utf-8')
         self.DEBUG = self.conf.getint('Work-Mode', 'debug')
         self.UA = self.conf.get('Client', 'uainfo')
+        self.useragent = self.conf.get('Client', 'useragent')
         self.user = self.conf.get('UserInf', 'user')
+    def save_config(self):
+        self.conf.set('Client', 'uainfo', self.UA)
+        self.conf.set('Client','useragent',self.useragent)
+        self.conf.write(open(confpath + 'default.ini', 'w'))
     def read_mitm_msg_formater(self):
         with open(path0 + 'conf/Msg_Formater.conf', mode='r', encoding='utf-8') as (f):
             t = bde(f.read())
@@ -68,11 +73,12 @@ class Hsj_Addon:
                 client = pick_ua(uastr)
                 self.run1st = False
                 if self.UA != client:
+                    self.useragent = uastr
                     e2e('HSJ_client_%s' % self.user, 
                         'Origin_Client:%s\nCurrent_Client:%s' % (self.UA, client))
-                    self.conf.set('Client', 'uainfo', client)
-                    self.conf.write(open(confpath + 'default.ini', 'w'))
                     self.logger.debug('%s--->%s' % (self.UA, client))
+                    self.UA=client
+                    self.save_config()
             self.record_msg(flow)
         if 'hushijie.com' in flow.request.host and 'start' in flow.request.path and 'answer' in flow.request.path and 'start_answer' not in flow.request.path:
             self.response_path = txtpath + 'start_response.txt'

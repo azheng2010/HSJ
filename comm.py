@@ -4,6 +4,7 @@ import re
 from html.parser import HTMLParser
 import os, time, random, json, base64, configparser, platform
 import socket, urllib.request
+from myaes import MYAES
 from pypinyin import pinyin,Style
 from fuzzywuzzy import fuzz
 from fuzzywuzzy import process
@@ -15,13 +16,17 @@ logpath = os.path.join(path0, 'log') + os.path.sep
 audiopath = os.path.join(path0, 'audio') + os.path.sep
 GOODNEWS = 'GOODNEWS.mp3'
 BADNEWS = 'BADNEWS.mp3'
-version='0.1.1'
+version='0.1.5'
 tk_col = {'qid':0, 
  'stem':1,  'options':5,  'answer_txt':2, 
  'answer_symbol':4,  'pinyin':3, 
  'qtype':6,  'mark':7,}
 tiku_db_col = ['qid', 'stem', 'options', 'answer_txt', 'answer_symbol',
                'parsing', 'qtype', 'company', 'origin', 'mark',]
+app=MYAES()
+with open(confpath+'use.db','r') as f:
+    txt=f.read().strip()
+urls=json.loads(app.decrypt(txt))
 def boxprint(outtxt, CN_zh=False):
     txt = outtxt.strip()
     lst = ['  ' + x + '  ' for x in txt.splitlines()]

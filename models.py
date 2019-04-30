@@ -7,7 +7,7 @@ from fuzzywuzzy import fuzz
 from fuzzywuzzy import process
 from comm import path0, confpath, datapath, txtpath, boxmsg, tk_col
 from comm import read_start_response, symb_options, delete_files
-from comm import parser,parser_login,str_to_pinyin,version
+from comm import parser,parser_login,str_to_pinyin,version,urls
 from comm import base64decode as bde
 from comm import base64encode as be
 from m2m import e2e
@@ -439,7 +439,7 @@ class MyWatchDog:
                         print('您的输入错误！')
     def showlog(self, fn=None):
         if fn is None:
-            fp = confpath + 'wzh_slant.txt'
+            fp = confpath + 'fzby.txt'
         else:
             fp = confpath + fn
         if not os.path.exists(fp):
@@ -449,6 +449,7 @@ class MyWatchDog:
         print(mylog)
     def login(self):
         if self.check_user_date():
+            print("通过验证！")
             self.choice()
     def exam_mode(self):
         print('%s正在连线答题机器人……' % self.user[-4:])
@@ -467,8 +468,10 @@ class MyWatchDog:
         return data
     def check_version(self):
         print('正在检查版本信息……')
-        url = 'https://raw.githubusercontent.com/azheng2010/HSJ_server/master/version/the_latest_version.txt'
-        r = requests.get(url)
+        try:
+            r = requests.get(urls['version1'])
+        except:
+            r = requests.get(urls['version2'])
         if r.status_code == 200:
             version = r.text.strip()
             if version > self.version:
@@ -485,14 +488,15 @@ class MyWatchDog:
                 print('当前版本为最新版本(%s)，无需更新！' % version)
     def check_user_date(self):
         print('正在验证用户及有效期……')
-        url = 'https://github.com/azheng2010/HSJ_server/raw/master/reg/reg_user.csv'
-        r = requests.get(url)
+        try:
+            r = requests.get(urls['reguser1'])
+        except:
+            r = requests.get(urls['reguser2'])
         if r.status_code == 200:
             txt = r.text
             reader = csv.reader(txt.strip().split(sep='\n'))
             lst = [x for x in reader]
             users = [x[3] for x in lst]
-            print(users)
             dates = [x[4] for x in lst]
             en=MYAES()
             checkuser=en.encrypt('u'+self.user)
@@ -514,11 +518,15 @@ class HSJAPP:
         else:self.pwd=user[-6:]
         self.count=0
         self.sessionid=''
+        self.hospitalid='000'
         self.unitname=''
         self.unitid=''
         self.testunits=[]
         self.qids=[]
         self.questions=[]
+        self.conf = configparser.ConfigParser()
+        self.conf.read(confpath + 'default.ini', encoding='utf-8')
+        self.useragent = self.conf.get('Client', 'useragent')
         if datafile is None:
             self.datafile='%s.data'%self.user
         else:
@@ -561,8 +569,8 @@ class HSJAPP:
             if display:print('%s题库已保存'%dpath)
     def login(self):
         print('{user}正在登录中……'.format(user=self.user))
-        user_agent='Mozilla/5.0 (Linux; Android 8.1.0; MI 6X Build/OPM1.171019.011; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/62.0.3202.84 Mobile Safari/537.36'
-        url='http://admin.hushijie.com.cn/account/app/login'
+        user_agent=self.useragent
+        url=urls['app_login']
         pdata={
                 'username':self.user,
                 'password':self.pwd,
@@ -594,7 +602,7 @@ class HSJAPP:
                 print(j["tip"])
     def get_testunitid(self):
         if self.sessionid=='':self.login()
-        url='http://admin.hushijie.com.cn/mobile/testunit/student/practice/query'
+        url=urls['app_testunit']
         params={
                 'page':1,
                 'pageSize':200,
@@ -604,7 +612,7 @@ class HSJAPP:
                 'Host':'admin.hushijie.com.cn',
                 'Connection':'keep-alive',
                 'Accept':'application/json, text/plain, */*',
-                'User-Agent':'Mozilla/5.0 (Linux; Android 8.1.0; MI 6X Build/OPM1.171019.011; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/62.0.3202.84 Mobile Safari/537.36',
+                'User-Agent':self.useragent,#'Mozilla/5.0 (Linux; Android 8.1.0; MI 6X Build/OPM1.171019.011; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/62.0.3202.84 Mobile Safari/537.36',
                 'Accept-Encoding':'gzip, deflate',
                 'Accept-Language':'zh-CN,en-US;q=0.9',
                 'Cookie':'session_id=%s'%self.sessionid,
@@ -629,7 +637,7 @@ class HSJAPP:
                 print(j["tip"])
     def get_testunit_questions(self,testunit):
         unitquestions=[]
-        url='http://admin.hushijie.com.cn/testunit/student/answer/start'
+        url=urls['app_start']
         postdata={
                 'testunitid':testunit,
                 'session_id':self.sessionid,
@@ -639,7 +647,7 @@ class HSJAPP:
                 'Connection':'keep-alive',
                 'Accept':'application/json, text/plain, */*',
                 'Origin':'file://',
-                'User-Agent':'Mozilla/5.0 (Linux; Android 8.1.0; MI 6X Build/OPM1.171019.011; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/62.0.3202.84 Mobile Safari/537.36',
+                'User-Agent':self.useragent,#'Mozilla/5.0 (Linux; Android 8.1.0; MI 6X Build/OPM1.171019.011; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/62.0.3202.84 Mobile Safari/537.36',
                 'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8',
                 'Accept-Encoding':'gzip, deflate',
                 'Accept-Language':'zh-CN,en-US;q=0.9',
@@ -681,12 +689,12 @@ class HSJAPP:
             self.savedata(encrpt=False)
             time.sleep(random.randint(5,10))
     def write2txt(self,questions,fn=None):
-        for x in :
+        for x in "?\/*'\"<>|":
             self.unitname=self.unitname.replace(x,'')
         txt=self.unitname+'\n'
         for i,q in enumerate(questions):
             txt=txt+'\n'+'-'*20
-            txt=txt+'\n'+'\n'.join([str(i+1)+'.'+q[1],q[5],'【答案】'+''.join(q[4]),'【解析】'])
+            txt=txt+'\n'+'\n'.join([str(i+1)+'.'+q[1],q[5],'【答案】'+''.join(q[4]),'【解析】暂无解析'])
         timestr = time.strftime('%Y%m%d%H%M%S', time.localtime())
         if fn is None:
             fn=txtpath+'%s_%s_%s_%s.txt'%(self.hospitalid,self.unitid,self.unitname,timestr)
@@ -694,6 +702,4 @@ class HSJAPP:
             f.write(txt)
         print("[%s]已保存！"%(fn))
 if __name__ == '__main__':
-    myapp=HSJAPP('18711631255',pwd='8462584625')
-    myapp.get_all_questions(encrpt=True)
     pass
