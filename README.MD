@@ -2,18 +2,19 @@
 
 #### 介绍
 HSJ辅助工具
-当前版本: 0.1.5
+当前版本: 0.1.6
 
 #### 软件架构
 软件架构说明
+![image]()
 HSJ
-  ├──comm.py        ：通用功能模块
-  ├──logger.py      ：日志模块
   ├──main.py        ：程序主入口
-  ├──mitm_test.py   ：mitm模块
+  ├──comm.py        ：通用功能模块
   ├──models.py      ：特定模块
-  ├──README.MD      ：说明文件
+  ├──logger.py      ：日志模块
+  ├──mitm_test.py   ：mitm模块
   ├──update.py      ：更新模块
+  ├──README.MD      ：说明文件
   └──conf           ：配置文件夹
   
 #### 安装教程
@@ -23,7 +24,9 @@ HSJ
 3. 下载本脚本程序
     首次下载，可用一键下载程序脚本：
     wget https://gitee.com/wzh2018/HSJ/repository/archive/master.zip -O HSJ-master.zip && unzip -o HSJ-master.zip && rm HSJ-master.zip
+    
     或者
+    
     wget https://github.com/azheng2010/HSJ/archive/master.zip -O HSJ-master.zip && unzip -o HSJ-master.zip && rm HSJ-master.zip
 4. 加载并运行脚本程序
 
