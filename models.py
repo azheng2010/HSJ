@@ -382,8 +382,9 @@ class SpiderMan:
         if self.DEBUG:
             print('正在进行网页搜索匹配……')
 class MyWatchDog:
-    def __init__(self, user, method, email, rate_min, rate_max):
+    def __init__(self, user, pwd,method, email, rate_min, rate_max):
         self.user = user
+        self.pwd = pwd
         self.rate_min = rate_min
         self.rate_max = rate_max
         self.method = method
@@ -400,6 +401,7 @@ class MyWatchDog:
         self.saveconfig()
     def saveconfig(self):
         self.conf.set('UserInf', 'user', self.user)
+        self.conf.set('UserInf', 'password', self.pwd)
         self.conf.set('Correctrate-Setting', 'max', str(self.rate_max))
         self.conf.set('Correctrate-Setting', 'min', str(self.rate_min))
         self.conf.set('Answer-Method', 'Method', self.method)
@@ -416,27 +418,35 @@ class MyWatchDog:
         choicenum = choicenum.strip()
         if choicenum == '1':
             print('--------------------')
-            print('你选择的是  [1]检查软件版本并更新程序')
+            print('你选择的是[1]检查软件版本并更新程序')
             print('--------------------')
             self.check_version()
         else:
             if choicenum == '2':
                 print('--------------------')
-                print('你选择的是  [2]更新题库')
+                print('你选择的是[2]更新题库')
                 print('--------------------')
+                self.update_questions()
             else:
                 if choicenum == '3':
                     print('--------------------')
-                    print('你选择的是  [3]更新程序后再更新题库')
+                    print('你选择的是[3]更新题库后再更新程序')
                     print('--------------------')
+                    self.update_questions()
+                    self.check_version()
                 else:
                     if choicenum == '4' or choicenum == '':
                         print('--------------------')
-                        print('你选择的是  [4]准备考试')
+                        print('你选择的是[4]准备考试')
                         print('--------------------')
                         self.exam_mode()
                     else:
-                        print('您的输入错误！')
+                        if choicenum == '5':
+                            print('--------------------')
+                            print('你选择的是[5]退出脚本程序')
+                            print('--------------------')
+                        else:
+                            print('您的输入错误！')
     def showlog(self, fn=None):
         if fn is None:
             fp = confpath + 'fzby.txt'
@@ -466,6 +476,9 @@ class MyWatchDog:
         parser=MYAES()
         data=parser.decrypt(data)
         return data
+    def update_questions(self):
+        myapp=HSJAPP(self.user,pwd=self.pwd)
+        myapp.get_all_questions(encrpt=True)
     def check_version(self):
         print('正在检查版本信息……')
         try:
