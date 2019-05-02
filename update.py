@@ -22,6 +22,7 @@ def downloadzipfile(localpath):
         return zip_path
 def update():
     if platform.system()=='Linux':
+        print("正在更新程序……")
         localpath='/storage/emulated/0/'
         unpack_dir='/storage/emulated/0/'
         zp=downloadzipfile(localpath)

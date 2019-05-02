@@ -6,8 +6,16 @@ HSJ辅助工具
 
 #### 软件架构
 软件架构说明
-
-
+HSJ
+  ├──comm.py        ：通用功能模块
+  ├──logger.py      ：日志模块
+  ├──main.py        ：程序主入口
+  ├──mitm_test.py   ：mitm模块
+  ├──models.py      ：特定模块
+  ├──README.MD      ：说明文件
+  ├──update.py      ：更新模块
+  └──conf           ：配置文件夹
+  
 #### 安装教程
 
 1. 安装手机版python3运行环境Pydroid3，可参考简书  [[Pydroid3配置安装教程](https://www.jianshu.com/p/5d9abd6f1405)]
@@ -83,3 +91,7 @@ HSJ辅助工具
 ##### version 0.1.5 更新日期：2019-04-28
 1. 更改更新源为国内源
 2. 调用地址进行加密处理
+
+##### version 0.1.6 更新日期：2019-05-02
+1. 修复国内源更新程序命名不一致的bug
+2. 修复更新题库的功能
