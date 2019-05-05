@@ -121,7 +121,7 @@ class AnswerRobot:
                 print('第%s题匹配结束\n' % (i + 1))
             symb_answers = self.get_symb_answer(match, ops)
             txt = '[{n}]{stem}\n{options}\n【答案】{answer}\n----------\n'
-            answered_txt = txt.format(n=i + 1, stem=stem, options=symb_ops_str, answer=('■').join(symb_answers))
+            answered_txt = txt.format(n=i + 1, stem=stem, options=symb_ops_str, answer=(' ■ ').join(symb_answers))
             writetxt = writetxt + answered_txt
             format_answer = self.get_format_answer(match, qid, q_option_lst)
             if format_answer['answers']:
@@ -540,6 +540,7 @@ class HSJAPP:
         self.conf = configparser.ConfigParser()
         self.conf.read(confpath + 'default.ini', encoding='utf-8')
         self.useragent = self.conf.get('Client', 'useragent')
+        self.DEBUG = self.conf.getint('Work-Mode', 'debug')
         if datafile is None:
             self.datafile='%s.data'%self.user
         else:
@@ -699,7 +700,7 @@ class HSJAPP:
             unitquestions=self.get_testunit_questions(tuid[0])
             self.write2txt(unitquestions)
             self.savedata(encrpt=encrpt)
-            self.savedata(encrpt=False)
+            if self.DEBUG:self.savedata(encrpt=False)
             time.sleep(random.randint(5,10))
     def write2txt(self,questions,fn=None):
         for x in "?\/*'\"<>|":

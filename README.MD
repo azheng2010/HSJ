@@ -6,17 +6,8 @@ HSJ辅助工具
 
 #### 软件架构
 软件架构说明
-![image]()
-HSJ
-  ├──main.py        ：程序主入口
-  ├──comm.py        ：通用功能模块
-  ├──models.py      ：特定模块
-  ├──logger.py      ：日志模块
-  ├──mitm_test.py   ：mitm模块
-  ├──update.py      ：更新模块
-  ├──README.MD      ：说明文件
-  └──conf           ：配置文件夹
-  
+![image](https://github.com/azheng2010/HSJ/blob/master/image/readme.png)
+
 #### 安装教程
 
 1. 安装手机版python3运行环境Pydroid3，可参考简书  [[Pydroid3配置安装教程](https://www.jianshu.com/p/5d9abd6f1405)]
