@@ -1,6 +1,6 @@
 #！/usr/bin/env python3
 # -*- coding: utf-8 -*-
-import os, time, csv, json, random, base64, urllib, configparser, platform, requests
+import os,time,csv,json,random,base64,urllib,configparser,platform,requests,demjson
 import update
 from subprocess import Popen
 from fuzzywuzzy import fuzz
@@ -458,6 +458,7 @@ class MyWatchDog:
             mylog = f.read()
         print(mylog)
     def login(self):
+        print(boxmsg('version : %s'%version))
         if self.check_user_date():
             print("通过验证！")
             self.choice()
@@ -535,6 +536,7 @@ class HSJAPP:
         self.unitname=''
         self.unitid=''
         self.testunits=[]
+        self.examedunits=[]
         self.qids=[]
         self.questions=[]
         self.conf = configparser.ConfigParser()
@@ -649,6 +651,43 @@ class HSJAPP:
                     print(flag,testunitid,testunitname,endtime)
             else:
                 print(j["tip"])
+    def get_examed_testunitid(self):
+        if self.sessionid=='':self.login()
+        url=urls["app_examlist"]
+        params={
+                'show':1,
+                'page':1,
+                'limit':200,
+                'status':1,
+                'session_id':self.sessionid,
+                }
+        headers={
+                'Host':'admin.hushijie.com.cn',
+                'Connection':'keep-alive',
+                'Accept':'application/json, text/plain, */*',
+                'User-Agent':self.useragent,
+                'Accept-Encoding':'gzip, deflate',
+                'Accept-Language':'zh-CN,en-US;q=0.9',
+                'Cookie':'session_id=%s'%self.sessionid,
+                'X-Requested-With':'cn.com.hushijie.app',
+                }
+        r=requests.get(url,headers=headers,params=params)
+        if r.status_code==200:
+            j=r.json()
+            if j["ret"]==1:
+                testunit_lst=j["appTestUnitVOList"]
+                for i,x in enumerate(testunit_lst):
+                    testunitid=x["testUnitId"]
+                    testunitname=x["testUnitName"]
+                    endtime=x['endTime']
+                    status=int(x['status'])
+                    self.examedunits.append((testunitid,testunitname))
+                    flag='○'
+                    if status>-1:
+                        flag='●'
+                    print(i,flag,testunitid,testunitname,endtime)
+            else:
+                print(j["tip"])
     def get_testunit_questions(self,testunit):
         unitquestions=[]
         url=urls['app_start']
@@ -672,7 +711,6 @@ class HSJAPP:
         if r.status_code==200:
             j=r.json()
             if j["ret"]==1:
-                j["examPaperFullInfo"]["name"]
                 qlst=j["examPaperFullInfo"]["questionRelations"]
                 classification=j["examPaperFullInfo"]["name"]
                 self.unitname=classification
@@ -692,6 +730,63 @@ class HSJAPP:
             else:
                 print(j["tip"])
         return unitquestions
+    def get_examed_questions(self,testunit):
+        unitquestions=[]
+        url=urls['app_get']
+        postdata={
+                'testunitid':testunit,
+                'session_id':self.sessionid,
+                }
+        headers={
+                'Host':'admin.hushijie.com.cn',
+                'Connection':'keep-alive',
+                'Accept':'application/json, text/plain, */*',
+                'Origin':'file://',
+                'User-Agent':self.useragent,
+                'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8',
+                'Accept-Encoding':'gzip, deflate',
+                'Accept-Language':'zh-CN,en-US;q=0.9',
+                'Cookie':'session_id=%s'%self.sessionid,
+                'X-Requested-With':'cn.com.hushijie.app',
+                }
+        r=requests.post(url,headers=headers,data=postdata)
+        if r.status_code==200:
+            text=r.text
+            s = text.replace('\\"', '')#替换返回数据中的\"
+            j = demjson.decode(s)
+            if j["ret"]==1:
+                qlst=j["testUnitAnswer"]["examPaperFullInfo"]["questionRelations"]
+                classification= j['testUnitAnswer']['examPaperFullInfo']['name']
+                self.unitname=classification
+                self.unitid=testunit
+                self.hospitalid=qlst[0]["question"]["hospitalid"]
+                stems=[x[tk_col['stem']] for x in self.questions]
+                for x in qlst:
+                    qid,stem,answertxt,answer2,options,type_name=parser(x)
+                    self.count+=1
+                    stempinyin=str_to_pinyin(stem)
+                    if stem not in stems:
+                        stems.append(stem)
+                        self.qids.append(qid)
+                        self.questions.append([qid,stem,answertxt,stempinyin,answer2,options,type_name,classification])
+                    unitquestions.append([qid,stem,answertxt,stempinyin,answer2,options,type_name,classification])
+                    print(qid,stem,answer2)
+                    print('已处理%s,当前题库共有%s题'%(self.count,len(self.qids)))
+            elif j['tip']=='用户需要登录!':
+                self.login()
+            else:
+                print(j["tip"])
+        return unitquestions
+    def get_all_examed_questions(self,encrpt=True):
+        if self.sessionid=='':self.login()
+        self.get_examed_testunitid()
+        for i,tuid in enumerate(self.examedunits):
+            print('正在提取%s的题目……'%tuid[1])
+            unitquestions=self.get_examed_questions(tuid[0])
+            self.write2txt(unitquestions)
+            self.savedata(encrpt=encrpt)
+            if self.DEBUG:self.savedata(encrpt=False)
+            time.sleep(random.randint(5,10))
     def get_all_questions(self,encrpt=True):
         if self.sessionid=='':self.login()
         self.get_testunitid()
@@ -716,4 +811,8 @@ class HSJAPP:
             f.write(txt)
         print("[%s]已保存！"%(fn))
 if __name__ == '__main__':
+    myapp=HSJAPP('13507499021',pwd='499021')
+    myapp.login()
+    myapp.get_all_examed_questions()
+    myapp.get_all_questions()
     pass

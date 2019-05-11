@@ -2,12 +2,12 @@
 
 #### 介绍
 HSJ辅助工具
-当前版本: 0.1.6
+当前版本: 0.1.8
 
 #### 软件架构
 软件架构说明
 ![image](https://github.com/azheng2010/HSJ/blob/master/image/readme.png)
-
+![image](https://gitee.com/wzh2018/HSJ/raw/master/image/readme.png)
 #### 安装教程
 
 1. 安装手机版python3运行环境Pydroid3，可参考简书  [[Pydroid3配置安装教程](https://www.jianshu.com/p/5d9abd6f1405)]
@@ -32,7 +32,7 @@ HSJ辅助工具
 
 1. [Pydroid3配置安装教程](https://www.jianshu.com/p/5d9abd6f1405)
 2. [MitmProxy的安装与使用](https://www.jianshu.com/p/7b0ea91c081c)
-3. 提交代码
+3. [辅助脚本使用说明](https://www.jianshu.com/p/87a6719f0545)
 4. 新建 Pull Request
 
 #### 版本更新日志
@@ -89,3 +89,13 @@ HSJ辅助工具
 ##### version 0.1.6 更新日期：2019-05-02
 1. 修复国内源更新程序命名不一致的bug
 2. 修复更新题库的功能
+
+##### version 0.1.7 更新日期：2019-05-08
+1. 修复连续多次使用崩溃的bug
+2. 修复读取考题文件的bug
+3. 优化了获取考试结果部分
+
+##### version 0.1.8 更新日期：2019-05-11
+1. 更新了使用说明文件
+2. 增加了考题新增入题库的功能
+3. 修复了脚本自我更新的bug

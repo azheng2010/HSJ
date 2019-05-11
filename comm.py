@@ -20,7 +20,7 @@ if not os.path.exists(logpath):os.makedirs(logpath)
 if not os.path.exists(confpath):os.makedirs(confpath)
 GOODNEWS = 'GOODNEWS.mp3'
 BADNEWS = 'BADNEWS.mp3'
-version='0.1.6'
+version='0.1.8'
 tk_col = {'qid':0, 
  'stem':1,  'options':5,  'answer_txt':2, 
  'answer_symbol':4,  'pinyin':3, 
@@ -214,15 +214,6 @@ def check_user(user):
         else:
             print('用户检测文件不存在，请微信联系hrcl2015')
         return False
-def make_usb_file(fname=None, nyears=1):
-    if not fname:
-        fname = 'usb.db'
-    fp = confpath + fname
-    t = int(time.time()) + 31536000 * nyears
-    s = base64encode(str(t))
-    with open(fp, 'w') as (f):
-        f.write(s)
-    print('使用权限到期时间：', time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(t)))
 def read_start_response(fdir=None, fname=None, makefile=False):
     if fdir is None:
         fdir = txtpath
@@ -232,35 +223,33 @@ def read_start_response(fdir=None, fname=None, makefile=False):
     with open(fpath, mode='r', encoding='utf-8') as (f):
         t = f.read()
     j = json.loads(t, encoding='utf-8')
-    if j['data']:
-        exam_lst = j['data']['questionRelations']
-        title = j['data']['name']
-    else:
-        if j['examPaperFullInfo']:
+    if j['examPaperFullInfo']:
             exam_lst = j['examPaperFullInfo']['questionRelations']
             title = j['examPaperFullInfo']['name']
-        else:
-            print('考题文件格式和以前不一样哦，不能处理！')
-            if not makefile:
-                return (None, None)
-            return
+    elif j['data']:
+            exam_lst = j['data']['questionRelations']
+            title = j['data']['name']
+    else:
+        print('考题文件格式和以前不一样哦，不能处理！')
         if not makefile:
-            return (
-             exam_lst, title)
-        format_txt = '\n{num}. [{qtype}]{stem}\n{options}\n'
-        fn = 'examfile' + time.strftime('_%Y%m%d_%H%M%S.txt', time.localtime())
-        fp = fdir + fn
-        with open(fp, mode='w', encoding='utf-8') as (f2):
-            f2.write(title + '\n')
-            for i, x in enumerate(exam_lst):
-                stem = x['question']['stem']
-                qtype = x['question']['questionTypeName']
-                options = [y['optionCont'] for y in x['question']['questionOptionList']]
-                options = symb_options(options)
-                s = format_txt.format(num=i + 1, qtype=qtype, stem=stem, options=('\n').join(options))
-                f2.write(s)
-        print('考题文件[%s]已生成！' % fn)
-        return fn
+            return (None, None)
+        return None
+    if not makefile:
+        return (exam_lst, title)
+    format_txt = '\n{num}. [{qtype}]{stem}\n{options}\n'
+    fn = 'examfile' + time.strftime('_%Y%m%d_%H%M%S.txt', time.localtime())
+    fp = fdir + fn
+    with open(fp, mode='w', encoding='utf-8') as (f2):
+        f2.write(title + '\n')
+        for i, x in enumerate(exam_lst):
+            stem = x['question']['stem']
+            qtype = x['question']['questionTypeName']
+            options = [y['optionCont'] for y in x['question']['questionOptionList']]
+            options = symb_options(options)
+            s = format_txt.format(num=i + 1, qtype=qtype, stem=stem, options=('\n').join(options))
+            f2.write(s)
+    print('考题文件[%s]已生成！' % fn)
+    return fn
 def symb_options(options):
     symbols = 'ABCDEFGHIJKL'
     symboptions = [symbols[iy] + '. ' + y for iy, y in enumerate(options)]

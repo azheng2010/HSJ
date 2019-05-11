@@ -19,6 +19,7 @@ class Hsj_Addon:
         self.request_path = ''
         self.answer_lst = None
         self.txt = None
+        self.examname=''
         self.run1st = True 
         self.read_config()
         self.logger = logger.logger()
@@ -76,22 +77,42 @@ class Hsj_Addon:
                     self.useragent = uastr
                     e2e('HSJ_client_%s' % self.user, 
                         'Origin_Client:%s\nCurrent_Client:%s' % (self.UA, client))
-                    self.logger.debug('%s--->%s' % (self.UA, client))
+                    self.logger.debug('UserAgent信息更改：%s--->%s' % (self.UA, client))
                     self.UA=client
                     self.save_config()
+            if self.flag=='exam_answer_saved':
+                with open(txtpath+'exam_standard_answer.txt','r',encoding='utf-8') as f:
+                    txt=f.read()
+                Relations=json.loads(txt,encoding='utf-8')
+                qids,questions=parser_exam_answer(Relations,self.examname)
+                for q in questions:
+                    stem_option=q[tk_col['stem']] + '\n' + q[tk_col['options']]
+                    if stem_option not in self.answer_robot.myowndata.stem_options:
+                        self.answer_robot.myowndata.qids.append(q[tk_col['qid']])
+                        self.answer_robot.add_data.qids.append(q[tk_col['qid']])
+                        self.answer_robot.myowndata.questions.append(q)
+                        self.answer_robot.add_data.questions.append(q)
+                self.answer_robot.myowndata.savedata()
+                self.answer_robot.add_data.savedata()
+                self.flag='exam_standard_answer_processed'
             self.record_msg(flow)
-        if 'hushijie.com' in flow.request.host and 'start' in flow.request.path and 'answer' in flow.request.path and 'start_answer' not in flow.request.path:
+        if 'hushijie.com' in flow.request.host and \
+            'answer/start' in flow.request.path and \
+            'start_answer' not in flow.request.path:
             self.response_path = txtpath + 'start_response.txt'
             text = flow.response.get_text()
             j = json.loads(text)
             if j['ret'] == 0:
                 print(j['tip'])
+                self.logger.debug(j['tip'])
             else:
                 if j['ret'] == 1:
                     print(boxmsg('已收到考试响应文件', CN_zh=True))
+                    self.logger.debug('已收到考试响应文件！')
                     with open(self.response_path, mode='w', encoding='utf-8') as (f):
                         f.write(text)
                     self.flag = 'exam_file_saved'
+                    self.logger.debug('考试文件已保存！')
                     print(('{rpath}已保存').format(rpath=self.response_path))
         if self.flag == 'commit':
             self.response_path = txtpath + 'commit_response.txt'
@@ -114,43 +135,43 @@ class Hsj_Addon:
                 info = parser_login(j['account'])
                 st = ('\n').join(self.txt.split(sep='&'))
                 msg = ('{st}\n{info}\n{sid}').format(st=st, info=info, sid=sessionid)
+                self.logger.debug('用户%s成功登陆app'%self.user)
                 if self.DEBUG:
                     print(msg)
                 if not e2e('护世界_登录信息_%s' % self.user, msg):
                     self.logger.error('Failed to send login')
                 self.txt = None
-        if 'hushijie.com' in flow.request.host and 'testunit/student/transcript/get' in flow.request.path:
+        if 'hushijie.com' in flow.request.host and \
+            'testunit/student/transcript/get' in flow.request.path:
             text = flow.response.get_text()
             s = text.replace('\\"', '')#替换返回数据中的\"
             j = demjson.decode(s)
             Relations=j["testUnitAnswer"]["examPaperFullInfo"]["questionRelations"]
-            examname = j['testUnitAnswer']['examPaperFullInfo']['name']
+            self.examname = j['testUnitAnswer']['examPaperFullInfo']['name']
             userdata = j['transcript']['userTranscript']
             totalscore = userdata['transcript']
             score = userdata['realTranscript']
             totalnum = userdata['questionNum']
             right = userdata['rightNum']
             wrong = userdata['wrongNum']
+            wrong = totalnum-right
             rate = int(round(right / totalnum * 100, 0))
             report_format = '考试名称：{examname}\n总分：{total}分，实际得分：{score}分\n总题数：{totalnum}题，答对{right}题，答错{wrong}题\n正确率：{rate}%'
-            report_txt = report_format.format(examname=examname, rate=rate, total=totalscore,
+            report_txt = report_format.format(examname=self.examname, rate=rate, total=totalscore,
                                               score=score,totalnum=totalnum,
                                               right=right,wrong=wrong)
             if not (e2e('HSJ_考试结果_%s' % self.user, report_txt, 
                         fps=[self.logger.log_file_path])):
                 self.logger.error('Failed to send exam_result！')
-            qids,questions=parser_exam_answer(Relations,examname)
-            for q in questions:
-                stem_option=q[tk_col['stem']] + '\n' + q[tk_col['options']]
-                if stem_option not in self.answer_robot.myowndata.stem_options:
-                    self.answer_robot.myowndata.qids.append(q[tk_col['qid']])
-                    self.answer_robot.add_data.qids.append(q[tk_col['qid']])
-                    self.answer_robot.myowndata.questions.append(q)
-                    self.answer_robot.add_data.questions.append(q)
-            self.answer_robot.myowndata.savedata()
-            self.answer_robot.add_data.savedata()
+            with open(txtpath+'exam_standard_answer.txt','w',encoding='utf-8') as f:
+                f.write(json.dumps(Relations,ensure_ascii=False))
+            self.flag='exam_answer_saved'
+            print(boxmsg('收到考试结果数据',CN_zh=True))
+            self.logger.debug('收到考试结果数据')
     def request(self, flow):
-        if 'hushijie' in flow.request.host and 'commit' in flow.request.path and flow.request.method == 'POST':
+        if 'hushijie' in flow.request.host and \
+            'commit' in flow.request.path and \
+            flow.request.method == 'POST':
             print(boxmsg('考生正在提交答案', CN_zh=True))
             self.id = flow.id
             self.flag = 'commit'
@@ -159,7 +180,7 @@ class Hsj_Addon:
             with open(self.request_path, mode='w', encoding='utf-8') as (f):
                 f.write(text)
             print(('{rpath}已保存').format(rpath=self.request_path))
-            self.logger.debug('考生正在提交答案……')
+            self.logger.debug('已收到考生提交的答案')
             if self.answer_robot.method == 'Auto':
                 self.logger.debug('机器人正在修改答案……')
                 if 'appVersion' in text:
