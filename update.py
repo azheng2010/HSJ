@@ -33,6 +33,7 @@ def update():
         zp=downloadzipfile(localpath)
         if zp is not None:
             unzip_file(zp, unpack_dir)
+            os.remove(zp)
             if os.path.basename(zp)=='master.zip':
                 updater_py_file(unpack_dir+'HSJ',path0,file_type='.py')
             elif os.path.basename(zp)=='HSJ-master.zip':
@@ -45,6 +46,7 @@ def updater_py_file(new_src,old_dst,file_type='.py'):
     lst=filter_file_type(new_src,file_type=file_type)
     if lst:
         for x in lst:
+            if x=='main.py':continue
             newfp=os.path.join(new_src,x)
             oldfp=os.path.join(old_dst,x)
             shutil.copyfile(newfp,oldfp,follow_symlinks=False)
@@ -65,7 +67,7 @@ def unzip_file(zip_src, dst_dir):
         for file in fz.namelist():
             print('unzipping %s'%file)
             fz.extract(file, dst_dir)
-        print('%s unzip finished'%zip_src)
+        print('%s unzip finished\n%s'%(zip_src,'-'*20))
     else:
         print('This is not zip files')
 def unpackfiles(zipname,unpack_dir=None,zipdir=''):
@@ -77,6 +79,7 @@ def unpackfiles(zipname,unpack_dir=None,zipdir=''):
         print('unpacked to [%s]'%os.path.abspath(unpack_dir))
     else:
         print(zipname,' is not exist!')
+    print('-'*20)
 if __name__=="__main__":
     localpath='d:/'
     downloadzipfile(localpath)

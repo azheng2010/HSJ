@@ -79,6 +79,7 @@ class AnswerRobot:
         self.sbwebpage = []
         self.notfound = []
     def match_answer(self):
+        t00=time.time()
         msg = boxmsg('正在匹配答案', CN_zh=True)
         print(msg)
         self.logger.debug(msg)
@@ -86,6 +87,7 @@ class AnswerRobot:
         writetxt = ''
         exam_lst, title = read_start_response()
         for i, x in enumerate(exam_lst):
+            t0=time.time()
             qid = x['questionid']
             self.qid.append(qid)
             stem = x['question']['stem']
@@ -100,23 +102,33 @@ class AnswerRobot:
                 print(stem)
                 print(symb_ops_str)
             if self.myowndata:
-                match = self.myowndata.search_by_stem_options(stem, symb_ops_str)
+                match=self.myowndata.search_by_stem(stem)
                 if match:
-                    self.sbstem.append(qid)
+                    self.sbqid.append(qid)
+                    if self.DEBUG:print('自有题库-题干搜索找到[%s]答案'%(qid))
+                else:
+                    match = self.myowndata.search_by_stem_options(stem, symb_ops_str)
+                    if match:
+                        self.sbstem.append(qid)
+                        if self.DEBUG:print('自有题库-题干选项匹配到[%s]答案'%(qid))
             if not match and self.mycommdata:
                 match = self.mycommdata.search_by_stem_options(stem, symb_ops_str)
                 if match:
                     self.sbstem.append(qid)
+                    if self.DEBUG:print('公共题库-题干选项匹配到[%s]答案'%(qid))
             if not match and self.mywebdb:
                 match = self.mywebdb.search_by_webdb(stem, symb_ops_str)
                 if match:
                     self.sbwebdb.append(qid)
+                    if self.DEBUG:print('网络数据库-题干选项搜索到[%s]答案'%(qid))
             if not match and self.mywebsearch:
                 match = self.mywebsearch.search_by_webpage(stem, symb_ops_str)
                 if match:
                     self.sbwebpage.append(qid)
+                    if self.DEBUG:print('网页搜索-题干选项搜索到[%s]答案'%(qid))
             if not match:
                 self.notfound.append(qid)
+                if self.DEBUG:print('未找到[%s]答案'%(qid))
             if self.DEBUG:
                 print('第%s题匹配结束\n' % (i + 1))
             symb_answers = self.get_symb_answer(match, ops)
@@ -126,6 +138,8 @@ class AnswerRobot:
             format_answer = self.get_format_answer(match, qid, q_option_lst)
             if format_answer['answers']:
                 all_answer_lst.append(format_answer)
+            t=time.time()-t0
+            print('本题匹配耗费%s秒'%t)
         own = len(self.sbqid)
         comm = len(self.sbstem)
         wdb = len(self.sbwebdb)
@@ -148,6 +162,11 @@ class AnswerRobot:
         print(tj)
         if not (e2e('HSJ_匹配的答案_%s' % self.user, '考试答案数据', fps=[fp])):
             self.logger.error('Failed to send exam_answer')
+        tt=time.time()-t00
+        average=tt/len(exam_lst)
+        time_msg='匹配过程总耗时%s秒，搜题%s个，平均%s秒'%(tt,len(exam_lst),average)
+        print(boxmsg(time_msg,CN_zh=True))
+        self.logger.debug(boxmsg(time_msg,CN_zh=True))
         return all_answer_lst
     def get_symb_answer(self, match, ops):
         if not match:
@@ -278,6 +297,7 @@ class Bumblebee:
         self.path0 = path0
         self.datafile = datafile
         self.qids = []
+        self.stems=[]
         self.stem_options = []
         self.questions = []
         self.dpath = datapath + self.datafile
@@ -302,6 +322,7 @@ class Bumblebee:
                 self.questions[i][tk_col['options']] = ('\n').join(self.questions[i][tk_col['options']])
             print('转换后样式：\n', self.questions[0])
             self.savedata(encrpt=encrpt)
+        self.stems=[q[tk_col['stem']].strip() for q in self.questions]
         self.stem_options = [q[tk_col['stem']] + '\n' + q[tk_col['options']] for q in self.questions]
         self.tips = ('{fn}题库加载完成，共{total}题').format(fn=self.datafile[-9:], total=len(self.questions))
         print(self.tips)
@@ -333,6 +354,15 @@ class Bumblebee:
             print('正在%s库进行qid匹配……' % self.datafile)
         if qid in self.qids:
             p = self.qids.index(qid)
+            match = self.questions[p]
+            return match
+        return
+    def search_by_stem(self, stem):
+        if self.DEBUG:
+            print('正在%s库进行stem匹配……' % self.datafile)
+        stem=stem.strip()
+        if stem in self.stems:
+            p = self.stems.index(stem)
             match = self.questions[p]
             return match
         return
@@ -537,6 +567,7 @@ class HSJAPP:
         self.unitid=''
         self.testunits=[]
         self.examedunits=[]
+        self.stems=[]
         self.qids=[]
         self.questions=[]
         self.conf = configparser.ConfigParser()
@@ -564,6 +595,7 @@ class HSJAPP:
             j=json.loads(bde(t),encoding='utf-8')
         self.qids=j['题库id']
         self.questions=j['题库']
+        self.stems=[q[tk_col['stem']] for q in self.questions]
         if self.datafile.split(sep='.')[0].isnumeric():
             fn=self.datafile[-9:]
         else:
@@ -760,17 +792,15 @@ class HSJAPP:
                 self.unitname=classification
                 self.unitid=testunit
                 self.hospitalid=qlst[0]["question"]["hospitalid"]
-                stems=[x[tk_col['stem']] for x in self.questions]
                 for x in qlst:
                     qid,stem,answertxt,answer2,options,type_name=parser(x)
                     self.count+=1
                     stempinyin=str_to_pinyin(stem)
-                    if stem not in stems:
-                        stems.append(stem)
+                    if stem not in self.stems:
+                        self.stems.append(stem)
                         self.qids.append(qid)
                         self.questions.append([qid,stem,answertxt,stempinyin,answer2,options,type_name,classification])
                     unitquestions.append([qid,stem,answertxt,stempinyin,answer2,options,type_name,classification])
-                    print(qid,stem,answer2)
                     print('已处理%s,当前题库共有%s题'%(self.count,len(self.qids)))
             elif j['tip']=='用户需要登录!':
                 self.login()
