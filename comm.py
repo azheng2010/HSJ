@@ -20,7 +20,7 @@ if not os.path.exists(logpath):os.makedirs(logpath)
 if not os.path.exists(confpath):os.makedirs(confpath)
 GOODNEWS = 'GOODNEWS.mp3'
 BADNEWS = 'BADNEWS.mp3'
-version='0.1.9'
+version='0.2.0'
 tk_col = {'qid':0, 
  'stem':1,  'options':5,  'answer_txt':2, 
  'answer_symbol':4,  'pinyin':3, 
