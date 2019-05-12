@@ -10,10 +10,10 @@ import zipfile
 def downloadzipfile(localpath):
     if platform.system() == 'Linux':
         try:
-            url=urls['zip2']
+            url=urls['zip3']
             r = requests.get(url)
         except:
-            url=urls['zip1']
+            url=urls['zip2']
             r = requests.get(url)
         if r.status_code==200:
             if 'github' in url:fn='HSJ-master.zip'
@@ -32,11 +32,15 @@ def update():
         if not os.path.exists(unpack_dir):os.makedirs(unpack_dir)
         zp=downloadzipfile(localpath)
         if zp is not None:
-            unzip_file(zp, unpack_dir)
-            os.remove(zp)
-            if os.path.basename(zp)=='master.zip':
+            if os.path.basename(zp)=='HSJ.zip':
+                unpackfiles(os.path.basename(zp),
+                            unpack_dir=os.path.join(unpack_dir,'HSJ'),
+                            zipdir=os.path.dirname(zp))
+                os.remove(zp)
                 updater_py_file(unpack_dir+'HSJ',path0,file_type='.py')
             elif os.path.basename(zp)=='HSJ-master.zip':
+                unzip_file(zp, unpack_dir)
+                os.remove(zp)
                 updater_py_file(unpack_dir+'HSJ-master',path0,file_type='.py')
             else:
                 print('无法更新')
@@ -59,6 +63,16 @@ def filter_file_type(fpath,file_type='.txt'):
     dirs = os.listdir(fpath) 
     lst=[x for x in dirs if file_type in os.path.splitext(x)[1]]
     return lst
+def zip_file(src_dir):
+    zip_name = src_dir +'.zip'
+    z = zipfile.ZipFile(zip_name,'w',zipfile.ZIP_DEFLATED)
+    for dirpath, dirnames, filenames in os.walk(src_dir):
+        fpath = dirpath.replace(src_dir,'')
+        fpath = fpath and fpath + os.sep or ''
+        for filename in filenames:
+            z.write(os.path.join(dirpath, filename),fpath+filename)
+            print ('==压缩成功==')
+    z.close()
 def unzip_file(zip_src, dst_dir):
     r = zipfile.is_zipfile(zip_src)
     print(zip_src)
@@ -81,6 +95,5 @@ def unpackfiles(zipname,unpack_dir=None,zipdir=''):
         print(zipname,' is not exist!')
     print('-'*20)
 if __name__=="__main__":
-    localpath='d:/'
-    downloadzipfile(localpath)
+    unpackfiles('HSJ.zip',unpack_dir='d:\\123',zipdir='D:\\MyPython\\HSJ_release\\HSJ_zip')
     pass
