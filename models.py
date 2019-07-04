@@ -6,8 +6,8 @@ from subprocess import Popen
 from fuzzywuzzy import fuzz
 from fuzzywuzzy import process
 from comm import path0, confpath, datapath, txtpath, boxmsg, tk_col
-from comm import read_start_response, symb_options, delete_files
-from comm import parser,parser_login,str_to_pinyin,version,urls
+from comm import read_start_response, symb_options
+from comm import parser,parser_course,parser_login,str_to_pinyin,version,urls
 from comm import base64decode as bde
 from comm import base64encode as be
 from m2m import e2e
@@ -48,6 +48,7 @@ class AnswerRobot:
         self.conf.read(self.confpath, encoding='utf-8')
         self.method = self.conf.get('Answer-Method', 'Method')
         self.user = self.conf.get('UserInf', 'user')
+        self.username = self.conf.get('UserInf', 'username')
         self.rate_max = int(self.conf.get('Correctrate-Setting', 'max'))
         self.rate_min = int(self.conf.get('Correctrate-Setting', 'min'))
         self.email = self.conf.get('Notice', 'email')
@@ -60,6 +61,7 @@ class AnswerRobot:
     def saveconfig(self):
         self.conf.set('Answer-Method', 'Method', self.method)
         self.conf.set('UserInf', 'user', self.user)
+        self.conf.set('UserInf', 'username',self.username)
         self.conf.set('Correctrate-Setting', 'max', str(self.rate_max))
         self.conf.set('Correctrate-Setting', 'min', str(self.rate_min))
         self.conf.set('Notice', 'email', self.email)
@@ -567,11 +569,14 @@ class HSJAPP:
         self.unitid=''
         self.testunits=[]
         self.examedunits=[]
+        self.courses=[]
+        self.questionsetid=None
+        self.testrecordid=None
         self.stems=[]
         self.qids=[]
         self.questions=[]
         self.conf = configparser.ConfigParser()
-        self.conf.read(confpath + 'default.ini', encoding='utf-8')
+        self.conf.read(confpath + 'default.ini',)# encoding='utf-8')
         self.useragent = self.conf.get('Client', 'useragent')
         self.DEBUG = self.conf.getint('Work-Mode', 'debug')
         if datafile is None:
@@ -646,8 +651,12 @@ class HSJAPP:
                                                    info["姓名"],
                                                    info["所属医院名称"],
                                                    info["所属部门"]))
+                self.hospitalid=info["医院代码"]
+                return True
             else:
                 print(j["tip"])
+                return False
+        return False
     def get_testunitid(self):
         if self.sessionid=='':self.login()
         url=urls['app_testunit']
@@ -747,7 +756,8 @@ class HSJAPP:
                 classification=j["examPaperFullInfo"]["name"]
                 self.unitname=classification
                 self.unitid=testunit
-                self.hospitalid=j["examPaperFullInfo"]["hospitalid"]
+                if self.hospitalid=='000':
+                    self.hospitalid=j["examPaperFullInfo"]["hospitalid"]
                 for x in qlst:
                     qid,stem,answertxt,answer2,options,type_name=parser(x)
                     self.count+=1
@@ -791,7 +801,8 @@ class HSJAPP:
                 classification= j['testUnitAnswer']['examPaperFullInfo']['name']
                 self.unitname=classification
                 self.unitid=testunit
-                self.hospitalid=qlst[0]["question"]["hospitalid"]
+                if self.hospitalid=='000':
+                    self.hospitalid=qlst[0]["question"]["hospitalid"]
                 for x in qlst:
                     qid,stem,answertxt,answer2,options,type_name=parser(x)
                     self.count+=1
@@ -840,9 +851,208 @@ class HSJAPP:
         with open(fn,'w',encoding='utf-8') as f:
             f.write(txt)
         print("[%s]已保存！"%(fn))
+    def get_course_testunitid(self):
+        if self.sessionid=='':self.login()
+        url='http://admin.hushijie.com.cn/mobile/ts_course/query/list'
+        params={
+                'page':1,
+                'pageSize':100,
+                'session_id':self.sessionid,
+                }
+        headers={
+                'Host':'admin.hushijie.com.cn',
+                'Connection':'keep-alive',
+                'Accept':'application/json, text/plain, */*',
+                'User-Agent':self.useragent,
+                'Accept-Encoding':'gzip, deflate',
+                'Accept-Language':'zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7',
+                'Cookie':'session_id=%s'%self.sessionid,
+                'X-Requested-With':'cn.com.hushijie.app',
+                }
+        r=requests.get(url,headers=headers,params=params)
+        if r.status_code==200:
+            j=r.json()
+            if j["ret"]==1:
+                course_lst=j["data"]
+                for i,x in enumerate(course_lst):
+                    courseid=x["id"]
+                    coursename=x["name"]
+                    status=int(x['studyState'])
+                    self.courses.append((courseid,coursename))
+                    flag='○'
+                    if status>-1:
+                        flag='●'
+                    print(i,flag,courseid,coursename,status)
+            else:
+                print(j["tip"])
+    def get_course_detail(self,courseid):
+        url='http://admin.hushijie.com.cn/mobile/ts_course/detail'
+        params={
+                'id':courseid,
+                'session_id':self.sessionid,
+                }
+        headers={
+                'Host':'admin.hushijie.com.cn',
+                'Connection':'keep-alive',
+                'Accept':'application/json, text/plain, */*',
+                'User-Agent':self.useragent,
+                'Accept-Encoding':'gzip, deflate',
+                'Accept-Language':'zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7',
+                'Cookie':'session_id=%s'%self.sessionid,
+                'X-Requested-With':'cn.com.hushijie.app',
+                }
+        r=requests.get(url,headers=headers,params=params)
+        if r.status_code==200:
+            j=r.json()
+            if j["ret"]==1:
+                courseid=j["data"]["course"]["id"]
+                coursename=j["data"]["course"]["name"]
+                questionsetid=j["data"]["questionSetId"]
+                self.questionsetid=questionsetid
+                print(courseid,questionsetid,coursename)
+                return questionsetid
+            elif j['tip']=='用户需要登录!':
+                self.login()
+            else:
+                print(j["tip"])
+        return None
+    def get_course_test_questions(self,courseid,coursename,questionsetid=None):
+        unitquestions=[]
+        url='http://admin.hushijie.com.cn/mobile/ts_course/question_list'
+        params={
+                'courseId':courseid,
+                'questionSetId':self.questionsetid,
+                'session_id':self.sessionid,
+                }
+        headers={
+                'Host':'admin.hushijie.com.cn',
+                'Connection':'keep-alive',
+                'Accept':'application/json, text/plain, */*',
+                'User-Agent':self.useragent,
+                'Accept-Encoding':'gzip, deflate',
+                'Accept-Language':'zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7',
+                'Cookie':'session_id=%s'%self.sessionid,
+                'X-Requested-With':'cn.com.hushijie.app',
+                }
+        r=requests.get(url,headers=headers,params=params)
+        if r.status_code==200:
+            j=r.json()
+            if j["ret"]==1:
+                qlst=j["data"]["testQuestionList"]
+                self.testrecordid=j["data"]["testRecord"]["id"]
+                print('获取到随堂练习试卷testrecordid=',self.testrecordid)
+                classification=coursename
+                self.unitname=classification
+                self.unitid=courseid
+                for x in qlst:
+                    qid,stem,answertxt,answer2,options,type_name=parser_course(x)
+                    self.count+=1
+                    stempinyin=str_to_pinyin(stem)
+                    unitquestions.append([qid,stem,answertxt,stempinyin,answer2,options,type_name,classification])
+            elif j['tip']=='用户需要登录!':
+                self.login()
+            else:
+                print(j["tip"])
+        return unitquestions
+    def submit_course_answer(self,courseid,answerlst,testrecordid=None):
+        answerstr=json.dumps(answerlst)
+        unitquestions=[]
+        url='http://admin.hushijie.com.cn/mobile/ts_course/test/submit_answer'
+        postdata={
+                'courseId':courseid,
+                'testRecordId':self.testrecordid,
+                'answerJson':answerstr,
+                'session_id':self.sessionid,
+                }
+        headers={
+                'Host':'admin.hushijie.com.cn',
+                'Connection':'keep-alive',
+                'Accept':'application/json, text/plain, */*',
+                'Origin':'file://',
+                'User-Agent':self.useragent,
+                'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8',
+                'Accept-Encoding':'gzip, deflate',
+                'Accept-Language':'zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7',
+                'Cookie':'session_id=%s'%self.sessionid,
+                'X-Requested-With':'cn.com.hushijie.app',
+                }
+        r=requests.post(url,headers=headers,data=postdata)
+        if r.status_code==200:
+            j = r.json()
+            if j["ret"]==1:
+                summit=j["data"]["answerScoreDetail"]
+                print("数据提交成功")
+                infstr='总题数:%s 答对:%s 答错:%s 未作答:%s\n总分:%s 得分:%s'%(
+                    summit["questionNum"],summit["rightNum"],summit["wrongNum"],
+                    summit["noAnswerNum"],summit["totalScore"],summit["realTotalScore"])
+                print(infstr)
+            elif j['tip']=='用户需要登录!':
+                self.login()
+            else:
+                print(j["tip"])
+        return unitquestions
+    def get_course_result_questions(self,courseid,coursename,testrecordid=None):
+        unitquestions=[]
+        url='http://admin.hushijie.com.cn/mobile/ts_course/test/result_detail'
+        params={
+                'courseId':courseid,
+                'testRecordId':self.testrecordid,
+                'session_id':self.sessionid,
+                }
+        headers={
+                'Host':'admin.hushijie.com.cn',
+                'Connection':'keep-alive',
+                'Accept':'application/json, text/plain, */*',
+                'User-Agent':self.useragent,
+                'Accept-Encoding':'gzip, deflate',
+                'Accept-Language':'zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7',
+                'Cookie':'session_id=%s'%self.sessionid,
+                'X-Requested-With':'cn.com.hushijie.app',
+                }
+        r=requests.get(url,headers=headers,params=params)
+        if r.status_code==200:
+            j=r.json()
+            if j["ret"]==1:
+                qlst=j["data"]["testQuestionList"]
+                classification=coursename
+                self.unitname=classification
+                self.unitid=courseid
+                for x in qlst:
+                    qid,stem,answertxt,answer2,options,type_name=parser_course(x)
+                    self.count+=1
+                    stempinyin=str_to_pinyin(stem)
+                    if stem not in self.stems:
+                        self.stems.append(stem)
+                        self.qids.append(qid)
+                        self.questions.append([qid,stem,answertxt,stempinyin,answer2,options,type_name,classification])
+                    unitquestions.append([qid,stem,answertxt,stempinyin,answer2,options,type_name,classification])
+                self.write2txt(unitquestions)
+            elif j['tip']=='用户需要登录!':
+                self.login()
+            else:
+                print(j["tip"])
+        return unitquestions
+    def get_all_course(self):
+        if self.sessionid=='':self.login()
+        self.get_course_testunitid()
+        for i,x in enumerate(self.courses):
+            print(i+1,x)
+            courseid=x[0]
+            coursename=x[1]
+            self.get_course_detail(courseid)
+            for y in range(2):
+                self.get_course_test_questions(courseid,coursename)
+                answerlst=[]
+                print('-----暂停60秒-----')
+                time.sleep(60)
+                self.submit_course_answer(courseid,answerlst)
+                self.get_course_result_questions(courseid,coursename)
+            print('=====暂停60秒=====')
+            time.sleep(60)
+        self.write2txt(self.questions,fn=txtpath+'随堂练习.txt')
+        pass
 if __name__ == '__main__':
-    myapp=HSJAPP('13507499021',pwd='499021')
-    myapp.login()
+    myapp=HSJAPP('00064030796',pwd='030796')
     myapp.get_all_examed_questions()
     myapp.get_all_questions()
     pass

@@ -50,4 +50,8 @@ def e2e(s, c, to=[], fps=None):
         fps=[]
     return send(f,n,p,t,h,s,c,fps)
 if __name__ == '__main__':
+    if e2e('测试主题','测试内容',to=['659402923@qq.com']):
+        print("发送成功")
+    else:
+        print('发送失败！！！')
     pass

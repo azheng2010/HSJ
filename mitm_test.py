@@ -32,9 +32,13 @@ class Hsj_Addon:
         self.UA = self.conf.get('Client', 'uainfo')
         self.useragent = self.conf.get('Client', 'useragent')
         self.user = self.conf.get('UserInf', 'user')
+        self.username=self.conf.get('UserInf', 'username')
+        self.hosp_id=self.conf.get('Hospital_Inf','hospital_id')
     def save_config(self):
         self.conf.set('Client', 'uainfo', self.UA)
         self.conf.set('Client','useragent',self.useragent)
+        self.conf.set('UserInf', 'username',self.username)
+        self.conf.set('Hospital_Inf','hospital_id',self.hosp_id)
         self.conf.write(open(confpath + 'default.ini', 'w'))
     def read_mitm_msg_formater(self):
         with open(path0 + 'conf/Msg_Formater.conf', mode='r', encoding='utf-8') as (f):
@@ -54,13 +58,11 @@ class Hsj_Addon:
         else:
             self.logger.info('\n' + be(t))
     def response(self, flow):
-        if 'hushijie.com' in flow.request.host and \
-            'appversion' in flow.request.path and \
-            self.flag == 'exam_file_saved':
+        if self.flag == 'exam_file_saved':
             self.flag = 'match_answer_processing'
             self.logger.debug(self.flag)
             fn = read_start_response(makefile=True)
-            if not (e2e('HSJ_log_%s' % self.user, '考题文件已保存', 
+            if not (e2e('HSJ_log_%s_%s' % (self.user,self.username), '考题文件已保存', 
                         fps=[self.logger.log_file_path,
                          txtpath + 'start_response.txt',
                          txtpath + fn])):
@@ -75,7 +77,7 @@ class Hsj_Addon:
                 self.run1st = False
                 if self.UA != client:
                     self.useragent = uastr
-                    e2e('HSJ_client_%s' % self.user, 
+                    e2e('HSJ_client_%s_%s' % (self.user,self.username), 
                         'Origin_Client:%s\nCurrent_Client:%s' % (self.UA, client))
                     self.logger.debug('UserAgent信息更改：%s--->%s' % (self.UA, client))
                     self.UA=client
@@ -121,8 +123,8 @@ class Hsj_Addon:
                 with open(self.response_path, mode='w', encoding='utf-8') as (f):
                     f.write(text)
                 print(('{rpath}已保存').format(rpath=self.response_path))
-                if not (e2e('HSJ_log_%s' % self.user, '答案数据已提交', fps=[
-                 self.logger.log_file_path, txtpath + 'commit_response.txt'])):
+                if not (e2e('HSJ_log_%s_%s' % (self.user,self.username), '答案数据已提交', 
+                            fps=[self.logger.log_file_path, txtpath + 'commit_response.txt'])):
                     self.logger.error('Failed to send commit_file')
         if 'hushijie.com' in flow.request.host and \
             flow.request.method == 'POST' and \
@@ -133,12 +135,15 @@ class Hsj_Addon:
             if j['ret'] == 1:
                 sessionid = j['sessionid']
                 info = parser_login(j['account'])
+                self.username=info["姓名"]
+                self.hosp_id=info["医院代码"]
+                self.save_config()
                 st = ('\n').join(self.txt.split(sep='&'))
                 msg = ('{st}\n{info}\n{sid}').format(st=st, info=info, sid=sessionid)
-                self.logger.debug('用户%s成功登陆app'%self.user)
+                self.logger.debug('用户%s%s成功登陆app'%(self.user,self.username))
                 if self.DEBUG:
                     print(msg)
-                if not e2e('护世界_登录信息_%s' % self.user, msg):
+                if not e2e('护世界_登录信息_%s_%s' % (self.user,self.username), msg):
                     self.logger.error('Failed to send login')
                 self.txt = None
         if 'hushijie.com' in flow.request.host and \
@@ -160,7 +165,7 @@ class Hsj_Addon:
             report_txt = report_format.format(examname=self.examname, rate=rate, total=totalscore,
                                               score=score,totalnum=totalnum,
                                               right=right,wrong=wrong)
-            if not (e2e('HSJ_考试结果_%s' % self.user, report_txt, 
+            if not (e2e('HSJ_考试结果_%s_%s' % (self.user,self.username), report_txt, 
                         fps=[self.logger.log_file_path])):
                 self.logger.error('Failed to send exam_result！')
             with open(txtpath+'exam_standard_answer.txt','w',encoding='utf-8') as f:

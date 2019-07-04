@@ -20,7 +20,7 @@ if not os.path.exists(logpath):os.makedirs(logpath)
 if not os.path.exists(confpath):os.makedirs(confpath)
 GOODNEWS = 'GOODNEWS.mp3'
 BADNEWS = 'BADNEWS.mp3'
-version='0.2.0'
+version='0.2.1'
 tk_col = {'qid':0, 
  'stem':1,  'options':5,  'answer_txt':2, 
  'answer_symbol':4,  'pinyin':3, 
@@ -258,6 +258,36 @@ def parser(questionRelation):
     typedic={1:'单选',2:'多选',3:'判断',}
     x=questionRelation
     qid=x["questionid"]
+    stem=x['question']['stem']
+    optionlst=x['question']['questionOptionList']
+    qtype=x['question']['questiontype']
+    answerNodic={1:'A',2:'B',3:'C',4:'D',5:'E',6:'F',7:'G',
+                 8:'H',9:'I',10:'J',11:'K',12:'L',13:'M',
+                 14:'N',15:'O',16:'P',17:'Q',18:'R',19:'S'}
+    answertxt=[]
+    answer2=[]
+    options_dic={}
+    for y in optionlst:
+        options_dic[y["questionNo"]]=answerNodic[y["questionNo"]]+'. '+y['optionCont']
+        if y['answer']==True and qtype==1:
+            answertxt.append(y['optionCont'])
+            answer2.append(answerNodic[y["questionNo"]])
+        if y['answer']==True and qtype==2:
+            answertxt.append(y['optionCont'])
+            answer2.append(answerNodic[y["questionNo"]])
+        if y['answer']==True and qtype==3:
+            answertxt.append(y['optionCont'])
+            answer2.append(answerNodic[y["questionNo"]])
+    answer2.sort()
+    p=list(options_dic.keys())
+    p.sort()
+    options='\n'.join([options_dic[z] for z in p])
+    type_name=typedic[qtype]
+    return qid,stem,answertxt,answer2,options,type_name
+def parser_course(testQuestionList):
+    typedic={1:'单选',2:'多选',3:'判断',}
+    x=testQuestionList
+    qid=x["questionId"]
     stem=x['question']['stem']
     optionlst=x['question']['questionOptionList']
     qtype=x['question']['questiontype']
