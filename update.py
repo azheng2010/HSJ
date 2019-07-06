@@ -13,12 +13,10 @@ def downloadzipfile(localpath):
             url=urls['zip3']
             r = requests.get(url)
         except:
-            url=urls['zip2']
+            url=urls['zip4']
             r = requests.get(url)
         if r.status_code==200:
-            if 'github' in url:fn='HSJ-master.zip'
-            elif 'gitee' in url:fn='master.zip'
-            else:return None
+            fn=url.split(sep='/')[-1]
             zip_path=os.path.abspath(os.path.join(localpath,fn))
             with open(zip_path,'wb') as f:
                 f.write(r.content)
