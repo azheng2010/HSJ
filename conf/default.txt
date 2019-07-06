@@ -23,6 +23,8 @@ user = 13870088955
 #账号
 password = 088955
 #密码
+username=张三
+#姓名
 
 [Correctrate-Setting]
 max = 85
