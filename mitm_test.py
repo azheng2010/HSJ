@@ -38,7 +38,7 @@ class Hsj_Addon:
         self.conf.set('Client', 'uainfo', self.UA)
         self.conf.set('Client','useragent',self.useragent)
         self.conf.set('UserInf', 'username',self.username)
-        self.conf.set('Hospital_Inf','hospital_id',self.hosp_id)
+        self.conf.set('Hospital_Inf','hospital_id',str(self.hosp_id))
         self.conf.write(open(confpath + 'default.ini', 'w',encoding='utf-8'))
     def read_mitm_msg_formater(self):
         with open(path0 + 'conf/Msg_Formater.conf', mode='r', encoding='utf-8') as (f):
