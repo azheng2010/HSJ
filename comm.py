@@ -20,7 +20,7 @@ if not os.path.exists(logpath):os.makedirs(logpath)
 if not os.path.exists(confpath):os.makedirs(confpath)
 GOODNEWS = 'GOODNEWS.mp3'
 BADNEWS = 'BADNEWS.mp3'
-version='0.2.1'
+version='0.2.2'
 tk_col = {'qid':0, 
  'stem':1,  'options':5,  'answer_txt':2, 
  'answer_symbol':4,  'pinyin':3, 
@@ -250,6 +250,17 @@ def read_start_response(fdir=None, fname=None, makefile=False):
             f2.write(s)
     print('考题文件[%s]已生成！' % fn)
     return fn
+def delete_start_response(fdir=None, fname=None):
+    if fdir is None:
+        fdir = txtpath
+    if fname is None:
+        fname = 'start_response.txt'
+    fpath = fdir + fname
+    if os.path.exists(fpath):
+        os.remove(fpath)
+        print('start_response.txt已删除！')
+    else:
+        print("%s文件不存在！！"%fpath)
 def symb_options(options):
     symbols = 'ABCDEFGHIJKL'
     symboptions = [symbols[iy] + '. ' + y for iy, y in enumerate(options)]

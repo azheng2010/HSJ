@@ -70,7 +70,7 @@ class AnswerRobot:
         self.conf.set('Search-Switch', 'webdb', str(self.WebDBFlag))
         self.conf.set('Search-Switch', 'websearch', str(self.WebSearchFlag))
         self.conf.set('Work-Mode', 'debug', str(self.DEBUG))
-        self.conf.write(open(self.confpath, 'w'))
+        self.conf.write(open(self.confpath, 'w',encoding='utf-8'))
         self.logger.debug(('保存配置文件{}').format(self.confpath))
         print(('配置文件{}已保存').format(self.confpath))
     def clear_sblst(self):
@@ -439,7 +439,7 @@ class MyWatchDog:
         self.conf.set('Answer-Method', 'Method', self.method)
         self.conf.set('Notice', 'email', self.email)
         self.conf.set('Version', 'version',self.version)
-        self.conf.write(open(self.confpathname, 'w'))
+        self.conf.write(open(self.confpathname, 'w',encoding='utf-8'))
         if self.DEBUG:
             print(('配置文件{}已保存').format(self.confpathname))
     def choice(self):
@@ -1052,7 +1052,7 @@ class HSJAPP:
         self.write2txt(self.questions,fn=txtpath+'随堂练习.txt')
         pass
 if __name__ == '__main__':
-    myapp=HSJAPP('00064030796',pwd='030796')
+    myapp=HSJAPP('15935138898',pwd='138898')
     myapp.get_all_examed_questions()
     myapp.get_all_questions()
     pass

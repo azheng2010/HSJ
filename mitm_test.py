@@ -6,7 +6,7 @@ import mitmproxy.http
 from mitmproxy import ctx
 from configparser import ConfigParser
 from comm import path0, txtpath, confpath, pick_ua, str_to_pinyin,tk_col
-from comm import getip, boxmsg, read_start_response, parser, parser_login
+from comm import getip, boxmsg, read_start_response, delete_start_response,parser, parser_login
 from comm import base64decode as bde
 from comm import base64encode as be
 from models import AnswerRobot
@@ -39,7 +39,7 @@ class Hsj_Addon:
         self.conf.set('Client','useragent',self.useragent)
         self.conf.set('UserInf', 'username',self.username)
         self.conf.set('Hospital_Inf','hospital_id',self.hosp_id)
-        self.conf.write(open(confpath + 'default.ini', 'w'))
+        self.conf.write(open(confpath + 'default.ini', 'w',encoding='utf-8'))
     def read_mitm_msg_formater(self):
         with open(path0 + 'conf/Msg_Formater.conf', mode='r', encoding='utf-8') as (f):
             t = bde(f.read())
@@ -114,6 +114,7 @@ class Hsj_Addon:
                     with open(self.response_path, mode='w', encoding='utf-8') as (f):
                         f.write(text)
                     self.flag = 'exam_file_saved'
+                    print(self.flag)
                     self.logger.debug('考试文件已保存！')
                     print(('{rpath}已保存').format(rpath=self.response_path))
         if self.flag == 'commit':
@@ -126,6 +127,7 @@ class Hsj_Addon:
                 if not (e2e('HSJ_log_%s_%s' % (self.user,self.username), '答案数据已提交', 
                             fps=[self.logger.log_file_path, txtpath + 'commit_response.txt'])):
                     self.logger.error('Failed to send commit_file')
+                delete_start_response()
         if 'hushijie.com' in flow.request.host and \
             flow.request.method == 'POST' and \
             'account/app/login' in flow.request.path:
@@ -190,10 +192,16 @@ class Hsj_Addon:
                 self.logger.debug('机器人正在修改答案……')
                 if 'appVersion' in text:
                     print('提交加密数据')
+                    if not self.answer_lst:
+                        self.answer_lst = self.answer_robot.match_answer()
+                        self.answer_lst = self.answer_robot.adjust_rate(self.answer_lst)
                     jdata = self.answer_robot.modify_answer(flow,
                       self.answer_lst, enc=True)
                 else:
                     print('提交不加密数据')
+                    if not self.answer_lst:
+                        self.answer_lst = self.answer_robot.match_answer()
+                        self.answer_lst = self.answer_robot.adjust_rate(self.answer_lst)
                     jdata = self.answer_robot.modify_answer(flow,
                       self.answer_lst, enc=False)
                     if 'CSP' in flow.request.headers:
