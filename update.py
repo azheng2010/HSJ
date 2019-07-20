@@ -5,8 +5,9 @@ import os
 import requests
 import shutil
 import platform
-from comm import urls,path0
+from comm import urls,path0,confpath
 import zipfile
+from configparser import ConfigParser
 def downloadzipfile(localpath):
     if platform.system() == 'Linux':
         try:
@@ -36,10 +37,14 @@ def update():
                             zipdir=os.path.dirname(zp))
                 os.remove(zp)
                 updater_py_file(unpack_dir+'HSJ',path0,file_type='.py')
+                updater_conf_file(os.path.realpath(unpack_dir+'HSJ/conf'),
+                                  os.path.realpath(confpath))
             elif os.path.basename(zp)=='HSJ-master.zip':
                 unzip_file(zp, unpack_dir)
                 os.remove(zp)
                 updater_py_file(unpack_dir+'HSJ-master',path0,file_type='.py')
+                updater_conf_file(os.path.realpath(unpack_dir+'HSJ-master/conf'),
+                                  os.path.realpath(confpath))
             else:
                 print('无法更新')
                 return
@@ -52,14 +57,28 @@ def updater_py_file(new_src,old_dst,file_type='.py'):
             newfp=os.path.join(new_src,x)
             oldfp=os.path.join(old_dst,x)
             shutil.copyfile(newfp,oldfp,follow_symlinks=False)
-            print(x,'update completed')
-    print('更新完毕')
+            print('%16s updated'%x)
+    print('py文件更新完毕')
+def updater_conf_file(new_src,old_dst):
+    lst=filter_file_type(new_src,file_type=None)
+    if lst:
+        for x in lst:
+            newfp=os.path.join(new_src,x)
+            oldfp=os.path.join(old_dst,x)
+            if x=='default.ini':
+                overwriteconf(oldfp,newfp)
+            shutil.copyfile(newfp,oldfp,follow_symlinks=False)
+            print('%s updated'%x)
+    print('conf目录更新完毕')
 def filter_file_type(fpath,file_type='.txt'):
     if not os.path.exists(fpath):
         print('指定目录不存在')
         return []
     dirs = os.listdir(fpath) 
-    lst=[x for x in dirs if file_type in os.path.splitext(x)[1]]
+    if file_type:
+        lst=[x for x in dirs if file_type in os.path.splitext(x)[1]]
+    else:
+        lst=[x for x in dirs if os.path.splitext(x)[1]]
     return lst
 def zip_file(src_dir):
     zip_name = src_dir +'.zip'
@@ -92,6 +111,23 @@ def unpackfiles(zipname,unpack_dir=None,zipdir=''):
     else:
         print(zipname,' is not exist!')
     print('-'*20)
+def overwriteconf(oldfn,newfn):
+    conf = ConfigParser()
+    data_lst=[]
+    conf.read(oldfn,encoding='utf-8')
+    sections=conf.sections()
+    for section in sections:
+        options=conf.options(section)
+        for option in options:
+            value=conf.get(section,option)
+            bar=[section,option,value]
+            data_lst.append(bar)
+            print('>>'.join(bar))
+    conf.read(newfn,encoding='utf-8')
+    for data in data_lst:
+        conf.set(data[0],data[1],data[2])
+    with open(newfn,'w',encoding='utf-8') as f:
+        conf.write(f)
 if __name__=="__main__":
     unpackfiles('HSJ.zip',unpack_dir='d:\\123',zipdir='D:\\MyPython\\HSJ_release\\HSJ_zip')
     pass

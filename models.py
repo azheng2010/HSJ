@@ -26,8 +26,6 @@ class AnswerRobot:
         self.sbwebdb = []
         self.sbwebpage = []
         self.notfound = []
-        timestr = time.strftime('%Y%m%d_%H%M%S', time.localtime())
-        self.add_data=Bumblebee(datafile='add_data_%s.data' % timestr, encrpt=True, debug=self.DEBUG)
         if self.OwnDataFlag:
             self.myowndata = Bumblebee(datafile='%s.data' % self.user, encrpt=True, debug=self.DEBUG)
         else:

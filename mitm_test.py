@@ -11,6 +11,7 @@ from comm import base64decode as bde
 from comm import base64encode as be
 from models import AnswerRobot
 import logger
+import threading
 class Hsj_Addon:
     def __init__(self):
         self.id = ''
@@ -19,8 +20,10 @@ class Hsj_Addon:
         self.request_path = ''
         self.answer_lst = None
         self.txt = None
+        self.all_match=False
         self.examname=''
         self.run1st = True 
+        self.heartbeat_span = 30
         self.read_config()
         self.logger = logger.logger()
         self.mitm_msg_formater = self.read_mitm_msg_formater()
@@ -28,6 +31,7 @@ class Hsj_Addon:
     def read_config(self):
         self.conf = ConfigParser()
         self.conf.read(confpath + 'default.ini', encoding='utf-8')
+        self.heartbeat_span = self.conf.getint('HeartBeat', 'span')
         self.DEBUG = self.conf.getint('Work-Mode', 'debug')
         self.UA = self.conf.get('Client', 'uainfo')
         self.useragent = self.conf.get('Client', 'useragent')
@@ -67,8 +71,11 @@ class Hsj_Addon:
                          txtpath + 'start_response.txt',
                          txtpath + fn])):
                 self.logger.error('Failed to send exam_file')
-            self.answer_lst = self.answer_robot.match_answer()
-            self.answer_lst = self.answer_robot.adjust_rate(self.answer_lst)
+            if not self.answer_lst:
+                self.answer_lst = self.answer_robot.match_answer()
+                if self.answer_robot.match_rate==100:
+                    self.all_match=True
+                self.answer_lst = self.answer_robot.adjust_rate(self.answer_lst)
         if 'hushijie.com' in flow.request.host:
             if self.run1st:
                 uastr = flow.request.headers['User-Agent']
@@ -91,13 +98,30 @@ class Hsj_Addon:
                     stem_option=q[tk_col['stem']] + '\n' + q[tk_col['options']]
                     if stem_option not in self.answer_robot.myowndata.stem_options:
                         self.answer_robot.myowndata.qids.append(q[tk_col['qid']])
-                        self.answer_robot.add_data.qids.append(q[tk_col['qid']])
                         self.answer_robot.myowndata.questions.append(q)
-                        self.answer_robot.add_data.questions.append(q)
                 self.answer_robot.myowndata.savedata()
-                self.answer_robot.add_data.savedata()
                 self.flag='exam_standard_answer_processed'
             self.record_msg(flow)
+        if 'hushijie.com' in flow.request.host and \
+            flow.request.method == 'POST' and \
+            'account/app/login' in flow.request.path:
+            self.txt = urllib.parse.unquote(flow.request.text)
+            text = flow.response.get_text()
+            j = json.loads(text)
+            if j['ret'] == 1:
+                sessionid = j['sessionid']
+                info = parser_login(j['account'])
+                self.username=info["姓名"]
+                self.hosp_id=info["医院代码"]
+                self.save_config()
+                st = ('\n').join(self.txt.split(sep='&'))
+                msg = ('{st}\n{info}\n{sid}').format(st=st, info=info, sid=sessionid)
+                self.logger.debug('用户%s%s成功登陆app'%(self.user,self.username))
+                if self.DEBUG:
+                    print(msg)
+                if not e2e('护世界_登录信息_%s_%s' % (self.user,self.username), msg):
+                    self.logger.error('Failed to send login')
+                self.txt = None
         if 'hushijie.com' in flow.request.host and \
             'answer/start' in flow.request.path and \
             'start_answer' not in flow.request.path:
@@ -129,26 +153,6 @@ class Hsj_Addon:
                     self.logger.error('Failed to send commit_file')
                 delete_start_response()
         if 'hushijie.com' in flow.request.host and \
-            flow.request.method == 'POST' and \
-            'account/app/login' in flow.request.path:
-            self.txt = urllib.parse.unquote(flow.request.text)
-            text = flow.response.get_text()
-            j = json.loads(text)
-            if j['ret'] == 1:
-                sessionid = j['sessionid']
-                info = parser_login(j['account'])
-                self.username=info["姓名"]
-                self.hosp_id=info["医院代码"]
-                self.save_config()
-                st = ('\n').join(self.txt.split(sep='&'))
-                msg = ('{st}\n{info}\n{sid}').format(st=st, info=info, sid=sessionid)
-                self.logger.debug('用户%s%s成功登陆app'%(self.user,self.username))
-                if self.DEBUG:
-                    print(msg)
-                if not e2e('护世界_登录信息_%s_%s' % (self.user,self.username), msg):
-                    self.logger.error('Failed to send login')
-                self.txt = None
-        if 'hushijie.com' in flow.request.host and \
             'testunit/student/transcript/get' in flow.request.path:
             text = flow.response.get_text()
             s = text.replace('\\"', '')#替换返回数据中的\"
@@ -175,6 +179,8 @@ class Hsj_Addon:
             self.flag='exam_answer_saved'
             print(boxmsg('收到考试结果数据',CN_zh=True))
             self.logger.debug('收到考试结果数据')
+            print(report_txt)
+            self.all_match=False
     def request(self, flow):
         if 'hushijie' in flow.request.host and \
             'commit' in flow.request.path and \
@@ -234,9 +240,22 @@ def parser_exam_answer(relations,examname,write_txt_flag=True):
             f.write(write_string)
         print('%s已生成！'%fp)
     return qids,questions
+def heartbeat(addon):
+    while True:
+        print('=========%s HeartBeat========'%addon.heartbeat_span)
+        if addon.flag=='exam_file_saved' and (not addon.answer_lst):
+            addon.answer_lst = addon.answer_robot.match_answer()
+            if addon.answer_robot.match_rate==100:
+                addon.all_match=True
+            addon.answer_lst = addon.answer_robot.adjust_rate(addon.answer_lst)
+            e2e('HSJ_心跳匹配_%s_%s' % (addon.user,addon.username), '心跳执行匹配答案')
+            print('flag=',addon.flag)
+        time.sleep(addon.heartbeat_span)
 ips = getip()
 ctx.log.info(('局域网IP：[{ip}]').format(ip=(' , ').join(ips)))
 ctx.log.info('请在另一台手机上设置http代理')
 txt = ('server:{ip}\nport:{port}').format(ip=(' | ').join(ips), port=8080)
 ctx.log.info(boxmsg(txt, CN_zh=False))
 addons = [ Hsj_Addon()]
+t = threading.Thread(target=heartbeat,args=(addons[0],))
+t.start()

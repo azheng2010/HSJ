@@ -13,14 +13,11 @@ datapath = os.path.join(path0, 'data') + os.path.sep
 confpath = os.path.join(path0, 'conf') + os.path.sep
 txtpath = os.path.join(path0, 'runtxt') + os.path.sep
 logpath = os.path.join(path0, 'log') + os.path.sep
-audiopath = os.path.join(path0, 'audio') + os.path.sep
 if not os.path.exists(datapath):os.makedirs(datapath)
 if not os.path.exists(txtpath):os.makedirs(txtpath)
 if not os.path.exists(logpath):os.makedirs(logpath)
 if not os.path.exists(confpath):os.makedirs(confpath)
-GOODNEWS = 'GOODNEWS.mp3'
-BADNEWS = 'BADNEWS.mp3'
-version='0.2.3'
+version='0.2.4'
 tk_col = {'qid':0, 
  'stem':1,  'options':5,  'answer_txt':2, 
  'answer_symbol':4,  'pinyin':3, 
