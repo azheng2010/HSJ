@@ -20,11 +20,12 @@ class Hsj_Addon:
         self.request_path = ''
         self.answer_lst = None
         self.txt = None
-        self.all_match=False
+        self.matched_no_answer=False
         self.examname=''
         self.run1st = True 
         self.heartbeat_span = 30
         self.heart_match_working=False
+        self.heart_match_end=False
         self.read_config()
         self.logger = logger.logger()
         self.mitm_msg_formater = self.read_mitm_msg_formater()
@@ -70,10 +71,10 @@ class Hsj_Addon:
                          txtpath + 'start_response.txt',
                          txtpath + fn])):
                 self.logger.error('Failed to send exam_file')
-            if not self.answer_lst:
+            if (not self.answer_lst) and (not self.heart_match_working):
                 self.answer_lst = self.answer_robot.match_answer()
-                if self.answer_robot.match_rate==100:
-                    self.all_match=True
+                if self.answer_robot.match_rate==0:
+                    self.matched_no_answer=True
                 self.answer_lst = self.answer_robot.adjust_rate(self.answer_lst)
             self.flag = 'match_answer_processing'
             self.logger.debug(self.flag)
@@ -180,9 +181,10 @@ class Hsj_Addon:
             print(boxmsg('收到考试结果数据',CN_zh=True))
             self.logger.debug('收到考试结果数据')
             print(report_txt)
-            self.all_match=False
+            self.matched_no_answer=False
             self.answer_lst=None
             delete_start_response()
+            self.heart_match_working=False
     def request(self, flow):
         if 'hushijie' in flow.request.host and \
             'commit' in flow.request.path and \
@@ -201,7 +203,7 @@ class Hsj_Addon:
                 self.logger.debug('机器人正在修改答案……')
                 if 'appVersion' in text:
                     print('提交加密数据')
-                    if (not self.answer_lst) and os.path.exists(txtpath+'start_response.txt'):
+                    if (not self.matched_no_answer) and (not self.answer_lst) and os.path.exists(txtpath+'start_response.txt'):
                         self.answer_lst = self.answer_robot.match_answer()
                         self.answer_lst = self.answer_robot.adjust_rate(self.answer_lst)
                     jdata = self.answer_robot.modify_answer(flow,
@@ -250,11 +252,11 @@ def heartbeat(addon):
         if (not addon.heart_match_working) and (addon.flag=='exam_file_saved') and (not addon.answer_lst):
             addon.heart_match_working=True
             addon.answer_lst = addon.answer_robot.match_answer()
-            if addon.answer_robot.match_rate==100:
-                addon.all_match=True
+            if addon.answer_robot.match_rate==0:
+                addon.matched_no_answer=True
             addon.answer_lst = addon.answer_robot.adjust_rate(addon.answer_lst)
+            addon.flag='match_answer_completed_heartbeat'
             e2e('HSJ_心跳匹配_%s_%s' % (addon.user,addon.username), '心跳执行匹配答案')
-            addon.heart_match_working=False
         time.sleep(addon.heartbeat_span)
 ips = getip()
 ctx.log.info(('局域网IP：[{ip}]').format(ip=(' , ').join(ips)))
