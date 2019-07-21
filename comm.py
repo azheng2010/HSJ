@@ -17,7 +17,7 @@ if not os.path.exists(datapath):os.makedirs(datapath)
 if not os.path.exists(txtpath):os.makedirs(txtpath)
 if not os.path.exists(logpath):os.makedirs(logpath)
 if not os.path.exists(confpath):os.makedirs(confpath)
-version='0.2.4'
+version='0.2.5'
 tk_col = {'qid':0, 
  'stem':1,  'options':5,  'answer_txt':2, 
  'answer_symbol':4,  'pinyin':3, 
@@ -392,5 +392,15 @@ def load_data_only(datafile):
     tips='{fn}题库加载完成，共{total}题'.format(fn=fn,total=len(questions))
     print(tips)
     return qids,questions
+def get_dir_file(fpath,file_type='.txt'):
+    if not os.path.exists(fpath):
+        print('指定目录不存在')
+        return []
+    dirs = os.listdir(fpath) 
+    if file_type:
+        lst=[x for x in dirs if file_type in os.path.splitext(x)[1]]
+    else:
+        lst=[x for x in dirs if os.path.splitext(x)[1]]
+    return lst
 if __name__ == '__main__':
     pass

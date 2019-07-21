@@ -24,6 +24,7 @@ class Hsj_Addon:
         self.examname=''
         self.run1st = True 
         self.heartbeat_span = 30
+        self.heart_match_working=False
         self.read_config()
         self.logger = logger.logger()
         self.mitm_msg_formater = self.read_mitm_msg_formater()
@@ -63,8 +64,6 @@ class Hsj_Addon:
             self.logger.info('\n' + be(t))
     def response(self, flow):
         if self.flag == 'exam_file_saved':
-            self.flag = 'match_answer_processing'
-            self.logger.debug(self.flag)
             fn = read_start_response(makefile=True)
             if not (e2e('HSJ_log_%s_%s' % (self.user,self.username), '考题文件已保存', 
                         fps=[self.logger.log_file_path,
@@ -76,6 +75,8 @@ class Hsj_Addon:
                 if self.answer_robot.match_rate==100:
                     self.all_match=True
                 self.answer_lst = self.answer_robot.adjust_rate(self.answer_lst)
+            self.flag = 'match_answer_processing'
+            self.logger.debug(self.flag)
         if 'hushijie.com' in flow.request.host:
             if self.run1st:
                 uastr = flow.request.headers['User-Agent']
@@ -151,7 +152,6 @@ class Hsj_Addon:
                 if not (e2e('HSJ_log_%s_%s' % (self.user,self.username), '答案数据已提交', 
                             fps=[self.logger.log_file_path, txtpath + 'commit_response.txt'])):
                     self.logger.error('Failed to send commit_file')
-                delete_start_response()
         if 'hushijie.com' in flow.request.host and \
             'testunit/student/transcript/get' in flow.request.path:
             text = flow.response.get_text()
@@ -181,11 +181,14 @@ class Hsj_Addon:
             self.logger.debug('收到考试结果数据')
             print(report_txt)
             self.all_match=False
+            self.answer_lst=None
+            delete_start_response()
     def request(self, flow):
         if 'hushijie' in flow.request.host and \
             'commit' in flow.request.path and \
             flow.request.method == 'POST':
             print(boxmsg('考生正在提交答案', CN_zh=True))
+            self.logger.debug(boxmsg('考生正在提交答案', CN_zh=True))
             self.id = flow.id
             self.flag = 'commit'
             self.request_path = txtpath + 'commit_request.txt'
@@ -198,18 +201,19 @@ class Hsj_Addon:
                 self.logger.debug('机器人正在修改答案……')
                 if 'appVersion' in text:
                     print('提交加密数据')
-                    if not self.answer_lst:
+                    if (not self.answer_lst) and os.path.exists(txtpath+'start_response.txt'):
                         self.answer_lst = self.answer_robot.match_answer()
                         self.answer_lst = self.answer_robot.adjust_rate(self.answer_lst)
                     jdata = self.answer_robot.modify_answer(flow,
-                      self.answer_lst, enc=True)
+                                                            self.answer_lst, enc=True)
+                    print('self.answer_lst=',len(self.answer_lst))
                 else:
                     print('提交不加密数据')
                     if not self.answer_lst:
                         self.answer_lst = self.answer_robot.match_answer()
                         self.answer_lst = self.answer_robot.adjust_rate(self.answer_lst)
                     jdata = self.answer_robot.modify_answer(flow,
-                      self.answer_lst, enc=False)
+                                                            self.answer_lst, enc=False)
                     if 'CSP' in flow.request.headers:
                         flow.request.headers.pop('CSP')
                 self.logger.debug('生成提交答案jdata\n%s' % jdata)
@@ -243,13 +247,14 @@ def parser_exam_answer(relations,examname,write_txt_flag=True):
 def heartbeat(addon):
     while True:
         print('=========%s HeartBeat========'%addon.heartbeat_span)
-        if addon.flag=='exam_file_saved' and (not addon.answer_lst):
+        if (not addon.heart_match_working) and (addon.flag=='exam_file_saved') and (not addon.answer_lst):
+            addon.heart_match_working=True
             addon.answer_lst = addon.answer_robot.match_answer()
             if addon.answer_robot.match_rate==100:
                 addon.all_match=True
             addon.answer_lst = addon.answer_robot.adjust_rate(addon.answer_lst)
             e2e('HSJ_心跳匹配_%s_%s' % (addon.user,addon.username), '心跳执行匹配答案')
-            print('flag=',addon.flag)
+            addon.heart_match_working=False
         time.sleep(addon.heartbeat_span)
 ips = getip()
 ctx.log.info(('局域网IP：[{ip}]').format(ip=(' , ').join(ips)))

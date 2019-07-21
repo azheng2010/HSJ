@@ -6,7 +6,7 @@ from subprocess import Popen
 from fuzzywuzzy import fuzz
 from fuzzywuzzy import process
 from comm import path0, confpath, datapath, txtpath, boxmsg, tk_col
-from comm import read_start_response, symb_options
+from comm import read_start_response, symb_options,get_dir_file
 from comm import parser,parser_course,parser_login,str_to_pinyin,version,urls
 from comm import base64decode as bde
 from comm import base64encode as be
@@ -497,6 +497,14 @@ class MyWatchDog:
         print('[连线成功]')
         cmdtxt = ('mitmdump -s {path}mitm_test.py').format(path=path0)
         if platform.system() == 'Windows':
+            import psutil
+            def kill_proc(proc_name_lst):
+                p=psutil.process_iter()
+                for x in p:
+                    if x.name() in proc_name_lst:
+                        x.kill()
+                        print('killed %10s %-10s'%(x.name(),x.pid))
+            kill_proc(['conhost.exe','cmd.exe'])
             os.system(cmdtxt)
         else:
             if platform.system() == 'Linux':
@@ -530,6 +538,13 @@ class MyWatchDog:
                     print('输入错误！')
             else:
                 print('当前版本为最新版本(%s)，无需更新！' % version)
+                i = input('是否强制更新？默认不更新[Y/n]:')
+                if i.upper() in ('Y', 'YES'):
+                    update.update()
+                elif i.upper() in ('N', 'NO',''):
+                    pass
+                else:
+                    print('输入错误！')
     def check_user_date(self):
         print('正在验证用户及有效期……')
         try:
@@ -805,11 +820,12 @@ class HSJAPP:
                     qid,stem,answertxt,answer2,options,type_name=parser(x)
                     self.count+=1
                     stempinyin=str_to_pinyin(stem)
+                    question_bar=[qid,stem,answertxt,stempinyin,answer2,options,type_name,classification]
                     if stem not in self.stems:
                         self.stems.append(stem)
                         self.qids.append(qid)
-                        self.questions.append([qid,stem,answertxt,stempinyin,answer2,options,type_name,classification])
-                    unitquestions.append([qid,stem,answertxt,stempinyin,answer2,options,type_name,classification])
+                        self.questions.append(question_bar)
+                    unitquestions.append(question_bar)
                     print('已处理%s,当前题库共有%s题'%(self.count,len(self.qids)))
             elif j['tip']=='用户需要登录!':
                 self.login()
@@ -839,6 +855,12 @@ class HSJAPP:
     def write2txt(self,questions,fn=None):
         for x in "?\/*'\"<>|":
             self.unitname=self.unitname.replace(x,'')
+        txt_lst=get_dir_file(txtpath,file_type='.txt')
+        fn_start='%s_%s_%s'%(self.hospitalid,self.unitid,self.unitname)
+        for xfn in txt_lst :
+            if xfn.startswith(fn_start):
+                print('勿需保存，存在相同文件：%s'%xfn)
+                return
         txt=self.unitname+'\n'
         for i,q in enumerate(questions):
             txt=txt+'\n'+'-'*20
@@ -1050,7 +1072,5 @@ class HSJAPP:
         self.write2txt(self.questions,fn=txtpath+'随堂练习.txt')
         pass
 if __name__ == '__main__':
-    myapp=HSJAPP('15935138898',pwd='138898')
-    myapp.get_all_examed_questions()
-    myapp.get_all_questions()
+    myapp=HSJAPP('18831097686',pwd='097686')
     pass
