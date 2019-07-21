@@ -20,6 +20,7 @@ class Hsj_Addon:
         self.request_path = ''
         self.answer_lst = None
         self.txt = None
+        self.matching=False
         self.matched_no_answer=False
         self.examname=''
         self.run1st = True 
@@ -72,6 +73,7 @@ class Hsj_Addon:
                          txtpath + fn])):
                 self.logger.error('Failed to send exam_file')
             if (not self.answer_lst) and (not self.heart_match_working):
+                self.matching=True
                 self.answer_lst = self.answer_robot.match_answer()
                 if self.answer_robot.match_rate==0:
                     self.matched_no_answer=True
@@ -185,6 +187,7 @@ class Hsj_Addon:
             self.answer_lst=None
             delete_start_response()
             self.heart_match_working=False
+            self.matching=False
     def request(self, flow):
         if 'hushijie' in flow.request.host and \
             'commit' in flow.request.path and \
@@ -249,7 +252,7 @@ def parser_exam_answer(relations,examname,write_txt_flag=True):
 def heartbeat(addon):
     while True:
         print('=========%s HeartBeat========'%addon.heartbeat_span)
-        if (not addon.heart_match_working) and (addon.flag=='exam_file_saved') and (not addon.answer_lst):
+        if (not addon.matching) and (not addon.heart_match_working) and (addon.flag=='exam_file_saved') and (not addon.answer_lst):
             addon.heart_match_working=True
             addon.answer_lst = addon.answer_robot.match_answer()
             if addon.answer_robot.match_rate==0:

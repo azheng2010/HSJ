@@ -221,6 +221,7 @@ class AnswerRobot:
         msg = boxmsg('答题机器人正在修正答案', CN_zh=True)
         print(msg)
         self.logger.debug(msg)
+        if answer_lst is None:answer_lst=[]
         txt = urllib.parse.unquote(flow.request.text)
         j = dict(urllib.parse.parse_qsl(txt))
         studentanswer = j['answer']
