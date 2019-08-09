@@ -17,7 +17,7 @@ if not os.path.exists(datapath):os.makedirs(datapath)
 if not os.path.exists(txtpath):os.makedirs(txtpath)
 if not os.path.exists(logpath):os.makedirs(logpath)
 if not os.path.exists(confpath):os.makedirs(confpath)
-version='0.2.5'
+version='0.2.6'
 tk_col = {'qid':0, 
  'stem':1,  'options':5,  'answer_txt':2, 
  'answer_symbol':4,  'pinyin':3, 
@@ -97,6 +97,21 @@ def folder_walk(fdir, file_type):
             for filename in filenames:
                 if filename.endswith(file_type) and parent == fdir:
                     file_lst.append(fdir + filename)
+    return file_lst
+def folder_walk2(fdir, file_type):
+    file_lst = []
+    if not fdir.endswith('/'):
+        fdir += '/'
+    if file_type == '*.*':
+        for parent, dirnames, filenames in os.walk(fdir):
+            for filename in filenames:
+                if parent == fdir:
+                    file_lst.append(filename)
+    else:
+        for parent, dirnames, filenames in os.walk(fdir):
+            for filename in filenames:
+                if filename.endswith(file_type) and parent == fdir:
+                    file_lst.append(filename)
     return file_lst
 def delete_files(fdir, file_type, fnames=None):
     if not fdir.endswith('/'):

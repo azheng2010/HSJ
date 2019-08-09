@@ -67,7 +67,7 @@ class Hsj_Addon:
     def response(self, flow):
         if self.flag == 'exam_file_saved':
             fn = read_start_response(makefile=True)
-            if not (e2e('HSJ_log_%s_%s' % (self.user,self.username), '考题文件已保存', 
+            if not (e2e('HSJ_提取试卷_%s_%s' % (self.user,self.username), '生成txt试卷', 
                         fps=[self.logger.log_file_path,
                          txtpath + 'start_response.txt',
                          txtpath + fn])):
@@ -78,6 +78,7 @@ class Hsj_Addon:
                 if self.answer_robot.match_rate==0:
                     self.matched_no_answer=True
                 self.answer_lst = self.answer_robot.adjust_rate(self.answer_lst)
+            e2e('HSJ_正常匹配_%s_%s' % (self.user,self.username), '正常执行匹配答案')
             self.flag = 'match_answer_processing'
             self.logger.debug(self.flag)
         if 'hushijie.com' in flow.request.host:
@@ -142,6 +143,7 @@ class Hsj_Addon:
                     with open(self.response_path, mode='w', encoding='utf-8') as (f):
                         f.write(text)
                     self.flag = 'exam_file_saved'
+                    e2e('HSJ_保存考题_%s_%s' % (self.user,self.username), '考题文件已保存',)
                     print(self.flag)
                     self.logger.debug('考试文件已保存！')
                     print(('{rpath}已保存').format(rpath=self.response_path))
@@ -217,6 +219,7 @@ class Hsj_Addon:
                     if not self.answer_lst:
                         self.answer_lst = self.answer_robot.match_answer()
                         self.answer_lst = self.answer_robot.adjust_rate(self.answer_lst)
+                        e2e('HSJ_提交前匹配_%s_%s' % (self.user,self.username), '提交试卷前执行匹配答案')
                     jdata = self.answer_robot.modify_answer(flow,
                                                             self.answer_lst, enc=False)
                     if 'CSP' in flow.request.headers:

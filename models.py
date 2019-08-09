@@ -160,7 +160,7 @@ class AnswerRobot:
         print(msg)
         self.logger.debug(msg)
         print(tj)
-        if not (e2e('HSJ_匹配的答案_%s' % self.user, '考试答案数据', fps=[fp])):
+        if not (e2e('HSJ_匹配完成_%s' % self.user, '匹配完成后的考试答案数据', fps=[fp])):
             self.logger.error('Failed to send exam_answer')
         tt=time.time()-t00
         average=tt/len(exam_lst)
@@ -1073,5 +1073,5 @@ class HSJAPP:
         self.write2txt(self.questions,fn=txtpath+'随堂练习.txt')
         pass
 if __name__ == '__main__':
-    myapp=HSJAPP('18831097686',pwd='097686')
+    myapp=HSJAPP('18692134622',pwd='sj131313')
     pass
