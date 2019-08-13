@@ -2,7 +2,6 @@
 # -*- coding: utf-8 -*-
 import os, json, urllib, time, demjson
 from m2m import e2e
-import mitmproxy.http
 from mitmproxy import ctx
 from configparser import ConfigParser
 from comm import path0, txtpath, confpath, pick_ua, str_to_pinyin,tk_col
@@ -83,6 +82,12 @@ class Hsj_Addon:
             self.logger.debug(self.flag)
         if 'hushijie.com' in flow.request.host:
             if self.run1st:
+                if os.path.exists(txtpath+'start_response.txt'):
+                    print(boxmsg('首次运行时检测到考题文件！',CN_zh=True))
+                    e2e('HSJ_首次运行检测异常_%s_%s' % (self.user,self.username), 
+                        '首次运行时检测到考题文件start_response.txt，请确认上次运行是否正常退出！！')
+                else:
+                    e2e('HSJ_首次运行检测正常_%s_%s' % (self.user,self.username), '检测到护世界软件')
                 uastr = flow.request.headers['User-Agent']
                 print(uastr)
                 client = pick_ua(uastr)
@@ -128,7 +133,7 @@ class Hsj_Addon:
                     self.logger.error('Failed to send login')
                 self.txt = None
         if 'hushijie.com' in flow.request.host and \
-            'answer/start' in flow.request.path and \
+            'student/answer/start' in flow.request.path and \
             'start_answer' not in flow.request.path:
             self.response_path = txtpath + 'start_response.txt'
             text = flow.response.get_text()
@@ -207,21 +212,22 @@ class Hsj_Addon:
             if self.answer_robot.method == 'Auto':
                 self.logger.debug('机器人正在修改答案……')
                 if 'appVersion' in text:
-                    print('提交加密数据')
+                    print('提交的是加密数据')
                     if (not self.matched_no_answer) and (not self.answer_lst) and os.path.exists(txtpath+'start_response.txt'):
                         self.answer_lst = self.answer_robot.match_answer()
                         self.answer_lst = self.answer_robot.adjust_rate(self.answer_lst)
-                    jdata = self.answer_robot.modify_answer(flow,
-                                                            self.answer_lst, enc=True)
+                        e2e('HSJ_提交前匹配_%s_%s' % (self.user,self.username), 
+                            '提交试卷前执行匹配答案')
+                    jdata = self.answer_robot.modify_answer(flow,self.answer_lst, enc=True)
                     print('self.answer_lst=',len(self.answer_lst))
                 else:
-                    print('提交不加密数据')
+                    print('提交的是不加密数据')
                     if not self.answer_lst:
                         self.answer_lst = self.answer_robot.match_answer()
                         self.answer_lst = self.answer_robot.adjust_rate(self.answer_lst)
-                        e2e('HSJ_提交前匹配_%s_%s' % (self.user,self.username), '提交试卷前执行匹配答案')
-                    jdata = self.answer_robot.modify_answer(flow,
-                                                            self.answer_lst, enc=False)
+                        e2e('HSJ_提交前匹配_%s_%s' % (self.user,self.username), 
+                            '提交试卷前执行匹配答案')
+                    jdata = self.answer_robot.modify_answer(flow,self.answer_lst, enc=False)
                     if 'CSP' in flow.request.headers:
                         flow.request.headers.pop('CSP')
                 self.logger.debug('生成提交答案jdata\n%s' % jdata)
