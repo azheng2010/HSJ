@@ -594,7 +594,7 @@ class HSJAPP:
         self.qids=[]
         self.questions=[]
         self.conf = configparser.ConfigParser()
-        self.conf.read(confpath + 'default.ini',)# encoding='utf-8')
+        self.conf.read(confpath + 'default.ini', encoding='utf-8')
         self.useragent = self.conf.get('Client', 'useragent')
         self.DEBUG = self.conf.getint('Work-Mode', 'debug')
         if datafile is None:
@@ -669,6 +669,10 @@ class HSJAPP:
                       ''.join(lazy_pinyin(info["姓名"])),
                       info["医院代码"]))
                 self.hospitalid=info["医院代码"]
+                self.conf.set('UserInf', 'username',info["姓名"])
+                self.conf.set('Hospital_Inf', 'hospital_id',str(info["医院代码"]))
+                self.conf.set('Hospital_Inf', 'hospital_name',info["所属医院名称"])
+                self.conf.write(open(confpath + 'default.ini', 'w',encoding='utf-8'))
                 e2e('登录信息_%s_%s'%(self.user,info["姓名"]),'登录成功:%s,%s\n%s'%(self.user,self.pwd,info))
                 return True
             else:
