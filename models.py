@@ -97,11 +97,10 @@ class AnswerRobot:
             ABCD_ops_lst = symb_options(ops)
             symb_ops_str = ('\n').join(ABCD_ops_lst)
             print('\n第[%s]题' % (i + 1))
-            if self.DEBUG:
-                print('====================', '\n', '正在匹配第%s题……' % (i + 1))
-                print('qid =', qid)
-                print(stem)
-                print(symb_ops_str)
+            print('====================', '\n', '正在匹配第%s题……' % (i + 1))
+            print('qid =', qid)
+            print(stem)
+            print(symb_ops_str)
             if self.myowndata:
                 match=self.myowndata.search_by_stem(stem)
                 if match:
@@ -130,8 +129,7 @@ class AnswerRobot:
             if not match:
                 self.notfound.append(qid)
                 if self.DEBUG:print('未找到[%s]答案'%(qid))
-            if self.DEBUG:
-                print('第%s题匹配结束\n' % (i + 1))
+            print('第%s题匹配结束\n' % (i + 1))
             symb_answers = self.get_symb_answer(match, ops)
             txt = '[{n}]{stem}\n{options}\n【答案】{answer}\n----------\n'
             answered_txt = txt.format(n=i + 1, stem=stem, options=symb_ops_str, answer=(' ■ ').join(symb_answers))
@@ -639,7 +637,7 @@ class HSJAPP:
             f.write(txt)
             if display:print('%s题库已保存'%dpath)
     def login(self):
-        print('{user}正在登录中……'.format(user=self.user))
+        print('{user}正在登录中……'.format(user=self.user[-4:]))
         user_agent=self.useragent
         url=urls['app_login']
         pdata={
@@ -665,7 +663,7 @@ class HSJAPP:
             if j["ret"]==1:
                 self.sessionid=j["sessionid"]
                 info=parser_login(j['account'])
-                print('%s登录成功!\n%s,%s'%(self.user,
+                print('%s登录成功!\n%s,%s'%(self.user[-4:],
                       ''.join(lazy_pinyin(info["姓名"])),
                       info["医院代码"]))
                 self.hospitalid=info["医院代码"]
@@ -711,7 +709,7 @@ class HSJAPP:
                     if status>-1:
                         self.testunits.append((testunitid,testunitname))
                         flag='●'
-                    print(flag,testunitid,testunitname,endtime)
+                        print(flag,testunitid,testunitname,endtime)
             else:
                 print(j["tip"])
     def get_examed_testunitid(self):
