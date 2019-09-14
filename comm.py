@@ -430,6 +430,15 @@ def get_email_data():
         de=MYAES()
         data_lst = [[de.decrypt(x[1]),de.decrypt(x[2]),x[3],x[4],de.decrypt(x[5]),de.decrypt(x[6]),de.decrypt(x[7])] for i,x in enumerate(lst) if i>0]
     return data_lst[0]
+def make_use_file():
+    app=MYAES()
+    with open('use.db未加密信息.txt','r') as f:
+        txt=f.read().strip()
+    with open(confpath+'use.db','w',encoding='utf-8') as f1:
+        f1.write(app.encrypt(txt))
+    with open('use.db','w',encoding='utf-8') as f2:
+        f2.write(app.encrypt(txt))
+    print('加密网址库use.db已生成！')
 M=get_email_data()
 if __name__ == '__main__':
     pass
