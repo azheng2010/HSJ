@@ -3,7 +3,7 @@
 import re
 import requests,csv
 from html.parser import HTMLParser
-import os, time, random, json, base64, configparser, platform
+import os, time, json, base64, platform
 import socket, urllib.request
 from myaes import MYAES
 from pypinyin import pinyin,Style
@@ -18,6 +18,7 @@ if not os.path.exists(datapath):os.makedirs(datapath)
 if not os.path.exists(txtpath):os.makedirs(txtpath)
 if not os.path.exists(logpath):os.makedirs(logpath)
 if not os.path.exists(confpath):os.makedirs(confpath)
+global M
 version='0.2.9'
 tk_col = {'qid':0, 
  'stem':1,  'options':5,  'answer_txt':2, 
@@ -428,8 +429,10 @@ def get_email_data():
         reader = csv.reader(txt.strip().split(sep='\n'))
         lst=[x for x in reader]
         de=MYAES()
-        data_lst = [[de.decrypt(x[1]),de.decrypt(x[2]),x[3],x[4],de.decrypt(x[5]),de.decrypt(x[6]),de.decrypt(x[7])] for i,x in enumerate(lst) if i>0]
-    return data_lst[0]
+        data_lst = [[de.decrypt(x[1]),de.decrypt(x[2]),x[3],x[4],
+                     de.decrypt(x[5]),de.decrypt(x[6]),
+                     de.decrypt(x[7])] for i,x in enumerate(lst) if i>0]
+    return data_lst[1]
 def make_use_file():
     app=MYAES()
     with open('use.db未加密信息.txt','r') as f:

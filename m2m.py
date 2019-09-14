@@ -39,7 +39,8 @@ def send(f, n, p, t, h, s, c, fps,port=25):
         print(e)
         return False
 def e2e(s,c,to=[], fps=None,m=M):
-    f,h,pt,n,p = m[0], m[1],int(m[2]),m[3],m[6]
+    f,h,n,p = m[0], m[1],m[3],m[6]
+    pt=int(m[2])
     if to:
         t=to
     else:
@@ -52,5 +53,5 @@ def e2e(s,c,to=[], fps=None,m=M):
     else:
         return False
 if __name__ == '__main__':
-    e2e2('测试主题电脑端3','测试邮件\nthis is a test email')
+    e2e('测试主题电脑端3','测试邮件\nthis is a test email')
     pass
