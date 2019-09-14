@@ -17,7 +17,7 @@ class Hsj_Addon:
         self.flag = ''
         self.response_path = ''
         self.request_path = ''
-        self.answer_lst = None
+        self.answer_lst = []
         self.txt = None
         self.matching=False
         self.matched_no_answer=False
@@ -191,7 +191,7 @@ class Hsj_Addon:
             self.logger.debug('收到考试结果数据')
             print(report_txt)
             self.matched_no_answer=False
-            self.answer_lst=None
+            self.answer_lst=[]
             delete_start_response()
             self.heart_match_working=False
             self.matching=False
@@ -217,9 +217,8 @@ class Hsj_Addon:
                         self.answer_lst = self.answer_robot.match_answer()
                         self.answer_lst = self.answer_robot.adjust_rate(self.answer_lst)
                         e2e('HSJ_提交前匹配_%s_%s' % (self.user,self.username), 
-                            '提交试卷前执行匹配答案')
+                            '提交试卷前执行匹配答案:%s%%准确率'%(self.answer_robot.match_rate))
                     jdata = self.answer_robot.modify_answer(flow,self.answer_lst, enc=True)
-                    print('self.answer_lst=',len(self.answer_lst))
                 else:
                     print('提交的是不加密数据')
                     if not self.answer_lst:
@@ -263,12 +262,13 @@ def heartbeat(addon):
         print('=========%s HeartBeat========'%addon.heartbeat_span)
         if (not addon.matching) and (not addon.heart_match_working) and (addon.flag=='exam_file_saved') and (not addon.answer_lst):
             addon.heart_match_working=True
+            addon.matching=True
             addon.answer_lst = addon.answer_robot.match_answer()
             if addon.answer_robot.match_rate==0:
                 addon.matched_no_answer=True
             addon.answer_lst = addon.answer_robot.adjust_rate(addon.answer_lst)
             addon.flag='match_answer_completed_heartbeat'
-            e2e('HSJ_心跳匹配_%s_%s' % (addon.user,addon.username), '心跳执行匹配答案')
+            e2e('HSJ_心跳匹配_%s_%s' % (addon.user,addon.username), '心跳执行匹配答案:%s%%准确率'%(len(addon.answer_robot.match_rate)))
         time.sleep(addon.heartbeat_span)
 ips = getip()
 ctx.log.info(('局域网IP：[{ip}]').format(ip=(' , ').join(ips)))

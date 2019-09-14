@@ -4,6 +4,7 @@ import smtplib, base64
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.application import MIMEApplication
+from comm import M
 def my_split(txt, seps):
     res = [txt]
     for sep in seps:
@@ -15,7 +16,7 @@ def bde(en64):
     btxt = base64.b64decode(en64.encode())
     txt = btxt.decode()
     return txt
-def send(f, n, p, t, h, s, c, fps):
+def send(f, n, p, t, h, s, c, fps,port=25):
     m = MIMEMultipart()
     m['Subject'] = s
     m['From'] = ('{n}<{f}>').format(n=n, f=f)
@@ -29,29 +30,27 @@ def send(f, n, p, t, h, s, c, fps):
                                    filename=('gbk', '', fn))
         m.attach(attachmentApart)
     try:
-        server = smtplib.SMTP(h, 25)
+        server = smtplib.SMTP(h, port)
         server.login(f, p)
         server.sendmail(f, t, m.as_string())
         server.quit()
         return True
     except smtplib.SMTPException as e:
+        print(e)
         return False
-def e2e(s, c, to=[], fps=None):
-    inf=bde(open('conf/usc.db','r',encoding='utf-8').read().strip()).split('|')
-    f = inf[0]
-    n= inf[2]
-    h = inf[1]
-    p = bde(open('conf/usa.db','r',encoding='utf-8').read().strip())
+def e2e(s,c,to=[], fps=None,m=M):
+    f,h,pt,n,p = m[0], m[1],int(m[2]),m[3],m[6]
     if to:
         t=to
     else:
-        t = [inf[3],inf[4]]
-    if fps is None:
-        fps=[]
-    return send(f,n,p,t,h,s,c,fps)
-if __name__ == '__main__':
-    if e2e('测试主题','测试内容',to=['659402923@qq.com']):
-        print("发送成功")
+        t = [m[4],m[5]]
+        t=[x for x in t if x]
+    if fps is None:fps=[]
+    if send(f,n,p,t,h,s,c,fps,port=pt):
+        print(n)
+        return True
     else:
-        print('发送失败！！！')
+        return False
+if __name__ == '__main__':
+    e2e2('测试主题电脑端3','测试邮件\nthis is a test email')
     pass
