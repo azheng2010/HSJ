@@ -18,7 +18,6 @@ if not os.path.exists(datapath):os.makedirs(datapath)
 if not os.path.exists(txtpath):os.makedirs(txtpath)
 if not os.path.exists(logpath):os.makedirs(logpath)
 if not os.path.exists(confpath):os.makedirs(confpath)
-global M
 version='0.2.9'
 tk_col = {'qid':0, 
  'stem':1,  'options':5,  'answer_txt':2, 
@@ -420,13 +419,10 @@ def get_dir_file(fpath,file_type='.txt'):
         lst=[x for x in dirs if os.path.splitext(x)[1]]
     return lst
 def get_email_data():
-    url1 = 'https://gitee.com/wzh2018/HSJ_server/raw/master/reg/mail_conf.csv'
-    url2 = 'https://raw.githubusercontent.com/azheng2010/HSJ_server/master/reg/mail_conf.csv'
-    urls=[url1,url2]
     try:
-        r = requests.get(urls[0])
+        r = requests.get(urls["giteemail"])
     except:
-        r = requests.get(urls[1])
+        r = requests.get(urls["githubmail"])
     if r.status_code == 200:
         txt = r.text
         reader = csv.reader(txt.strip().split(sep='\n'))
