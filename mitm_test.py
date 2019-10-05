@@ -22,6 +22,8 @@ class Hsj_Addon:
         self.matching=False
         self.matched_no_answer=False
         self.examname=''
+        self.exampaperid=0
+        self.hosp_id=0
         self.run1st = True 
         self.heartbeat_span = 30
         self.heart_match_working=False
@@ -41,6 +43,7 @@ class Hsj_Addon:
         self.username=self.conf.get('UserInf', 'username')
         self.hosp_id=self.conf.get('Hospital_Inf','hospital_id')
     def save_config(self):
+        self.conf.set('UserInf', 'user', self.user)
         self.conf.set('Client', 'uainfo', self.UA)
         self.conf.set('Client','useragent',self.useragent)
         self.conf.set('UserInf', 'username',self.username)
@@ -77,7 +80,8 @@ class Hsj_Addon:
                 if self.answer_robot.match_rate==0:
                     self.matched_no_answer=True
                 self.answer_lst = self.answer_robot.adjust_rate(self.answer_lst)
-            e2e('HSJ_正常匹配_%s_%s' % (self.user,self.username), '正常执行匹配答案')
+            e2e('HSJ_正常匹配_%s_%s' % (self.user,self.username), 
+                '正常执行匹配答案:%s%%准确率'%self.answer_robot.match_rate)
             self.flag = 'match_answer_processing'
             self.logger.debug(self.flag)
         if 'hushijie.com' in flow.request.host:
@@ -103,7 +107,8 @@ class Hsj_Addon:
                 with open(txtpath+'exam_standard_answer.txt','r',encoding='utf-8') as f:
                     txt=f.read()
                 Relations=json.loads(txt,encoding='utf-8')
-                qids,questions=parser_exam_answer(Relations,self.examname)
+                qids,questions=parser_exam_answer(Relations,self.examname,
+                               self.exampaperid,self.hosp_id)
                 for q in questions:
                     stem_option=q[tk_col['stem']] + '\n' + q[tk_col['options']]
                     if stem_option not in self.answer_robot.myowndata.stem_options:
@@ -120,7 +125,8 @@ class Hsj_Addon:
             j = json.loads(text)
             if j['ret'] == 1:
                 sessionid = j['sessionid']
-                info = parser_login(j['account'])
+                info=parser_login(j['account'])
+                self.user=info["电话"]
                 self.username=info["姓名"]
                 self.hosp_id=info["医院代码"]
                 self.save_config()
@@ -169,6 +175,10 @@ class Hsj_Addon:
             j = demjson.decode(s)
             Relations=j["testUnitAnswer"]["examPaperFullInfo"]["questionRelations"]
             self.examname = j['testUnitAnswer']['examPaperFullInfo']['name']
+            for x in "?\/*'\"<>|":
+                self.examname=self.examname.replace(x,'')
+            self.exampaperid=j["testUnit"]["examPaperId"]
+            self.hosp_id=j["testUnit"]["hospitalid"]
             userdata = j['transcript']['userTranscript']
             totalscore = userdata['transcript']
             score = userdata['realTranscript']
@@ -233,7 +243,7 @@ class Hsj_Addon:
                 modify_content = urllib.parse.urlencode(jdata).encode()
                 flow.request.content = modify_content
                 print(boxmsg('答案修改完毕，已提交答案', CN_zh=True))
-def parser_exam_answer(relations,examname,write_txt_flag=True):
+def parser_exam_answer(relations,examname,exampaperid,hospitalid,write_txt_flag=True):
     qids=[]
     questions=[]
     total=len(relations)
@@ -251,8 +261,8 @@ def parser_exam_answer(relations,examname,write_txt_flag=True):
             questions.append([qid,stem,answertxt,stempinyin,answer2,options,type_name,examname])
         print('处理进度[%s/%s]'%(i+1,total))
     if write_txt_flag:
-        timestr = time.strftime('%Y%m%d_%H%M%S', time.localtime())
-        fp=txtpath+'%s(标准答案)%s.txt'%(examname,timestr)
+        fn='%s_%s_%s.txt'%(hospitalid,exampaperid,examname)
+        fp=txtpath+fn
         with open(fp,'w',encoding='utf-8') as f:
             f.write(write_string)
         print('%s已生成！'%fp)
@@ -268,7 +278,7 @@ def heartbeat(addon):
                 addon.matched_no_answer=True
             addon.answer_lst = addon.answer_robot.adjust_rate(addon.answer_lst)
             addon.flag='match_answer_completed_heartbeat'
-            e2e('HSJ_心跳匹配_%s_%s' % (addon.user,addon.username), '心跳执行匹配答案:%s%%准确率'%(len(addon.answer_robot.match_rate)))
+            e2e('HSJ_心跳匹配_%s_%s' % (addon.user,addon.username), '心跳执行匹配答案:%s%%准确率'%(addon.answer_robot.match_rate))
         time.sleep(addon.heartbeat_span)
 ips = getip()
 ctx.log.info(('局域网IP：[{ip}]').format(ip=(' , ').join(ips)))

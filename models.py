@@ -7,13 +7,15 @@ from subprocess import Popen
 from fuzzywuzzy import fuzz
 from fuzzywuzzy import process
 from comm import path0, confpath, datapath, txtpath, boxmsg, tk_col
-from comm import read_start_response, symb_options,get_dir_file
+from comm import read_start_response, symb_options,get_dir_file,delete_files
 from comm import parser,parser_course,parser_login,str_to_pinyin,version,urls
 from comm import base64decode as bde
 from comm import base64encode as be
 from m2m import e2e
 from HSJ_AES import AESCipher
 from myaes import MYAES
+from qiniuyun import MY_QINIU
+myqny=MY_QINIU()
 class AnswerRobot:
     def __init__(self, logger):
         self.logger = logger
@@ -86,6 +88,7 @@ class AnswerRobot:
         self.logger.debug(msg)
         all_answer_lst = []
         writetxt = ''
+        mini_writetxt=''
         exam_lst, title = read_start_response()
         for i, x in enumerate(exam_lst):
             t0=time.time()
@@ -132,8 +135,11 @@ class AnswerRobot:
             print('第%s题匹配结束\n' % (i + 1))
             symb_answers = self.get_symb_answer(match, ops)
             txt = '[{n}]{stem}\n{options}\n【答案】{answer}\n----------\n'
+            mini_txt='[{n}]{mini_answer}\n'
             answered_txt = txt.format(n=i + 1, stem=stem, options=symb_ops_str, answer=(' ■ ').join(symb_answers))
+            mini_answered_txt=mini_txt.format(n=i+1,mini_answer=''.join([x[0] for x in symb_answers]))
             writetxt = writetxt + answered_txt
+            mini_writetxt=mini_writetxt+mini_answered_txt
             format_answer = self.get_format_answer(match, qid, q_option_lst)
             if format_answer['answers']:
                 all_answer_lst.append(format_answer)
@@ -150,17 +156,22 @@ class AnswerRobot:
         tj = tj_txt.format(own=own, comm=comm, wdb=wdb, ws=ws, no=no, total=total,
           rate=self.match_rate)
         timestr = time.strftime('%Y%m%d_%H%M%S', time.localtime())
-        fp = txtpath + '考题答案_%s.txt' % timestr
-        writetxt = title + '\n\n' + tj + '\n\n' + writetxt
-        with open(fp, 'w', encoding='utf-8') as (f):
+        fp = txtpath+'考题答案_%s.txt'%timestr
+        mini_fp=txtpath+'纯答案_%s.txt'%timestr
+        writetxt=title+'\n\n'+tj+'\n\n'+writetxt
+        mini_writetxt=title+'\n\n'+mini_writetxt
+        with open(fp, 'w', encoding='utf-8') as f:
             f.write(writetxt)
             print(fp, '已生成')
+        with open(mini_fp,'w',encoding='utf-8') as f2:
+            f2.write(mini_writetxt)
         msg = boxmsg('答案匹配已完成', CN_zh=True)
         print(msg)
         self.logger.debug(msg)
         print(tj)
-        if not (e2e('HSJ_匹配完成_%s' % self.user, '匹配完成后的考试答案数据', fps=[fp])):
+        if not (e2e('HSJ_匹配完成_%s' % self.user, '匹配完成后的考试答案数据', fps=[fp,mini_fp])):
             self.logger.error('Failed to send exam_answer')
+        delete_files(txtpath,None,fnames=[mini_fp[len(txtpath):]],display=False)
         tt=time.time()-t00
         average=tt/len(exam_lst)
         time_msg='匹配过程总耗时%s秒，搜题%s个，平均%s秒'%(tt,len(exam_lst),average)
@@ -217,6 +228,7 @@ class AnswerRobot:
             enc_answer_lst.append(enc_answer)
         return enc_answer_lst
     def modify_answer(self, flow, answer_lst, enc=True):
+        time0=time.time()
         msg = boxmsg('答题机器人正在修正答案', CN_zh=True)
         print(msg)
         self.logger.debug(msg)
@@ -239,6 +251,8 @@ class AnswerRobot:
             answertxt = json.dumps(join_answer).replace(' ', '')
             j['answer'] = e.encrypt(answertxt).decode()
         self.clear_sblst()
+        ttt=time.time()-time0
+        print("<modify_answer> took :%s seconds"%ttt)
         return j
     def join_robot_student(self, robot_answer, student_answer):
         r_a_qid = [x['questionid'] for x in robot_answer]
@@ -440,6 +454,17 @@ class MyWatchDog:
         self.conf.write(open(self.confpathname, 'w',encoding='utf-8'))
         if self.DEBUG:
             print(('配置文件{}已保存').format(self.confpathname))
+    def watchdoginit(self):
+        if platform.system() == 'Windows':
+            import psutil
+            def kill_proc(proc_name_lst):
+                p=psutil.process_iter()
+                for x in p:
+                    if x.name() in proc_name_lst:
+                        print('系统进程存在%s，请确保将该进程杀死！！'%x.name())
+                        x.kill()
+                        print('killed %10s %-10s'%(x.name(),x.pid))
+            kill_proc(['conhost.exe','cmd.exe'])
     def choice(self):
         print(boxmsg('version : %s'%version))
         fp = confpath + 'choice.txt'
@@ -500,14 +525,6 @@ class MyWatchDog:
         print('[连线成功]')
         cmdtxt = ('mitmdump -s {path}mitm_test.py').format(path=path0)
         if platform.system() == 'Windows':
-            import psutil
-            def kill_proc(proc_name_lst):
-                p=psutil.process_iter()
-                for x in p:
-                    if x.name() in proc_name_lst:
-                        x.kill()
-                        print('killed %10s %-10s'%(x.name(),x.pid))
-            kill_proc(['conhost.exe','cmd.exe'])
             os.system(cmdtxt)
         else:
             if platform.system() == 'Linux':
@@ -592,7 +609,7 @@ class HSJAPP:
         self.qids=[]
         self.questions=[]
         self.conf = configparser.ConfigParser()
-        self.conf.read(confpath + 'default.ini', encoding='utf-8')
+        self.conf.read(confpath + 'default.ini', encoding='utf-8' )
         self.useragent = self.conf.get('Client', 'useragent')
         self.DEBUG = self.conf.getint('Work-Mode', 'debug')
         if datafile is None:
@@ -617,6 +634,15 @@ class HSJAPP:
         self.qids=j['题库id']
         self.questions=j['题库']
         self.stems=[q[tk_col['stem']] for q in self.questions]
+        if "000000" in self.qids:
+            print('有老版本数据格式需要转换……')
+            for i,x in enumerate(self.qids):
+                if x == "000000":
+                    self.qids[i]=0
+                    self.questions[i][tk_col['qid']]=0
+            print('转换完成！')
+            self.savedata()
+            self.savedata(encrpt=False)
         if self.datafile.split(sep='.')[0].isnumeric():
             fn=self.datafile[-9:]
         else:
@@ -671,6 +697,13 @@ class HSJAPP:
                 self.conf.set('Hospital_Inf', 'hospital_id',str(info["医院代码"]))
                 self.conf.set('Hospital_Inf', 'hospital_name',info["所属医院名称"])
                 self.conf.write(open(confpath + 'default.ini', 'w',encoding='utf-8'))
+                ufn='%s%s.json'%(info["电话"],info["姓名"])
+                lf=txtpath+ufn
+                rf='user_json/%s'%ufn
+                with open(lf,'w',encoding='utf-8') as f:
+                    f.write(json.dumps(info,ensure_ascii=False))
+                myqny.upload_file(lf,rf,overwrite=True)
+                delete_files(txtpath,None,fnames=[ufn],display=False)
                 e2e('登录信息_%s_%s'%(self.user,info["姓名"]),'登录成功:%s,%s\n%s'%(self.user,self.pwd,info))
                 return True
             else:
@@ -1081,6 +1114,4 @@ class HSJAPP:
         self.write2txt(self.questions,fn=txtpath+'随堂练习.txt')
         pass
 if __name__ == '__main__':
-    myapp=HSJAPP('18711714582',pwd='714582')
-    myapp.login()
     pass

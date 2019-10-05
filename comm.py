@@ -19,7 +19,7 @@ if not os.path.exists(txtpath):os.makedirs(txtpath)
 if not os.path.exists(logpath):os.makedirs(logpath)
 if not os.path.exists(confpath):os.makedirs(confpath)
 global M
-version='0.2.9'
+version='0.3.0'
 tk_col = {'qid':0, 
  'stem':1,  'options':5,  'answer_txt':2, 
  'answer_symbol':4,  'pinyin':3, 
@@ -115,8 +115,8 @@ def folder_walk2(fdir, file_type):
                 if filename.endswith(file_type) and parent == fdir:
                     file_lst.append(filename)
     return file_lst
-def delete_files(fdir, file_type, fnames=None):
-    if not fdir.endswith('/'):
+def delete_files(fdir, file_type, fnames=None,display=True):
+    if not (fdir.endswith('/') or fdir.endswith('\\')):
         fdir += '/'
     if not os.path.exists(fdir):
         print('指定的目录不存在！')
@@ -126,13 +126,13 @@ def delete_files(fdir, file_type, fnames=None):
         for fpath in fpaths:
             if os.path.exists(fpath):
                 os.remove(fpath)
-                print('[%s]已删除' % fpath)
+                if display:print('[%s]已删除' % fpath)
     if fnames is not None:
         for fn in fnames:
             fpath = fdir + fn
             if os.path.exists(fpath):
                 os.remove(fpath)
-                print('[%s]已删除' % fpath)
+                if display:print('[%s]已删除' % fpath)
 def filter_page_labels(htmltxt, save=None):
     result = []
     start = []
