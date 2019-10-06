@@ -383,7 +383,7 @@ class Bumblebee:
     def search_by_stem_options(self, stem, options):
         if self.DEBUG:
             print('正在%s库进行相似度匹配……' % self.datafile)
-        base_score = 70
+        base_score = 70  
         option_score = 80
         searchtxt = ('\n').join([stem, options])
         print(searchtxt)
@@ -391,8 +391,6 @@ class Bumblebee:
           scorer=fuzz.UWRatio)
         if one is None:
             return
-        if self.DEBUG:
-            print('题干+选项匹配得分：', one[1])
         print('题目匹配相似度：%s%%' % one[1])
         if one[1] < base_score:
             return
@@ -401,15 +399,11 @@ class Bumblebee:
         if self.DEBUG:
             print('一次匹配结果\n', match)
         score = fuzz.token_sort_ratio(options, match[tk_col['options']])
-        if self.DEBUG:
-            print('纯选项匹配得分：', score)
         print('选项匹配相似度：%s%%' % score)
         if score >= option_score:
             print('匹配答案：', match[tk_col['answer_txt']])
             print('--------------------')
             return match
-        if self.DEBUG:
-            print('未匹配上数据\n----------')
         print('未匹配到答案！')
         print('--------------------')
         return None
@@ -530,7 +524,7 @@ class MyWatchDog:
             if platform.system() == 'Linux':
                 Popen(cmdtxt, shell=True)
             else:
-                print('登录失败！')
+                print('未知的操作系统！')
     def decryptinfo(self, data):
         parser=MYAES()
         data=parser.decrypt(data)

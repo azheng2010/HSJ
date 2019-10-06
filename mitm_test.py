@@ -4,7 +4,7 @@ import os, json, urllib, time, demjson
 from m2m import e2e
 from mitmproxy import ctx
 from configparser import ConfigParser
-from comm import path0, txtpath, confpath, pick_ua, str_to_pinyin,tk_col
+from comm import path0, txtpath, confpath, pick_ua, str_to_pinyin,tk_col,logger_level
 from comm import getip, boxmsg, read_start_response, delete_start_response,parser, parser_login
 from comm import base64decode as bde
 from comm import base64encode as be
@@ -29,7 +29,7 @@ class Hsj_Addon:
         self.heart_match_working=False
         self.heart_match_end=False
         self.read_config()
-        self.logger = logger.logger()
+        self.logger = logger.logger(set_level=logger_level)
         self.mitm_msg_formater = self.read_mitm_msg_formater()
         self.answer_robot = AnswerRobot(self.logger)
     def read_config(self):
@@ -69,7 +69,7 @@ class Hsj_Addon:
     def response(self, flow):
         if self.flag == 'exam_file_saved':
             fn = read_start_response(makefile=True)
-            if not (e2e('HSJ_提取试卷_%s_%s' % (self.user,self.username), '生成txt试卷', 
+            if not (e2e('HSJ_提取试卷_%s_%s' % (self.user,self.username), '读取并生成txt试卷,为匹配做准备!', 
                         fps=[self.logger.log_file_path,
                          txtpath + 'start_response.txt',
                          txtpath + fn])):
@@ -80,29 +80,30 @@ class Hsj_Addon:
                 if self.answer_robot.match_rate==0:
                     self.matched_no_answer=True
                 self.answer_lst = self.answer_robot.adjust_rate(self.answer_lst)
-            e2e('HSJ_正常匹配_%s_%s' % (self.user,self.username), 
-                '正常执行匹配答案:%s%%准确率'%self.answer_robot.match_rate)
-            self.flag = 'match_answer_processing'
-            self.logger.debug(self.flag)
+                e2e('HSJ_正常匹配_%s_%s' % (self.user,self.username), 
+                    '正常执行匹配答案:%s%%准确率'%self.answer_robot.match_rate)
+                self.flag = 'match_answer_processing'
+                self.logger.debug(self.flag)
         if 'hushijie.com' in flow.request.host:
             if self.run1st:
                 if os.path.exists(txtpath+'start_response.txt'):
-                    print(boxmsg('首次运行时检测到考题文件！',CN_zh=True))
-                    e2e('HSJ_首次运行检测异常_%s_%s' % (self.user,self.username), 
+                    print(boxmsg('异常：首次运行时检测到考题文件！',CN_zh=True))
+                    e2e('HSJ_首次运行异常_%s_%s' % (self.user,self.username), 
                         '首次运行时检测到考题文件start_response.txt，请确认上次运行是否正常退出！！')
                 else:
-                    e2e('HSJ_首次运行检测正常_%s_%s' % (self.user,self.username), '检测到护世界软件')
+                    e2e('HSJ_首次运行正常_%s_%s' % (self.user,self.username), '检测到护世界软件')
                 uastr = flow.request.headers['User-Agent']
                 print(uastr)
                 client = pick_ua(uastr)
                 self.run1st = False
-                if self.UA != client:
-                    self.useragent = uastr
-                    e2e('HSJ_client_%s_%s' % (self.user,self.username), 
-                        'Origin_Client:%s\nCurrent_Client:%s' % (self.UA, client))
-                    self.logger.debug('UserAgent信息更改：%s--->%s' % (self.UA, client))
-                    self.UA=client
-                    self.save_config()
+                if client:
+                    if self.UA != client:
+                        self.useragent = uastr
+                        e2e('HSJ_client_%s_%s' % (self.user,self.username), 
+                            'Origin_Client:%s\nCurrent_Client:%s' % (self.UA, client))
+                        self.logger.debug('UserAgent信息更改：%s--->%s' % (self.UA, client))
+                        self.UA=client
+                        self.save_config()
             if self.flag=='exam_answer_saved':
                 with open(txtpath+'exam_standard_answer.txt','r',encoding='utf-8') as f:
                     txt=f.read()
@@ -205,6 +206,7 @@ class Hsj_Addon:
             delete_start_response()
             self.heart_match_working=False
             self.matching=False
+            self.answer_robot.match_rate=0
     def request(self, flow):
         if 'hushijie' in flow.request.host and \
             'commit' in flow.request.path and \
@@ -242,7 +244,7 @@ class Hsj_Addon:
                 self.logger.debug('生成提交答案jdata\n%s' % jdata)
                 modify_content = urllib.parse.urlencode(jdata).encode()
                 flow.request.content = modify_content
-                print(boxmsg('答案修改完毕，已提交答案', CN_zh=True))
+                print(boxmsg('答案修改完毕，正在提交中', CN_zh=True))
 def parser_exam_answer(relations,examname,exampaperid,hospitalid,write_txt_flag=True):
     qids=[]
     questions=[]

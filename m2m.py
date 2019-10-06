@@ -5,6 +5,7 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.application import MIMEApplication
 from comm import M
+import time
 def my_split(txt, seps):
     res = [txt]
     for sep in seps:
@@ -39,6 +40,8 @@ def send(f, n, p, t, h, s, c, fps,port=25):
         print(e)
         return False
 def e2e(s,c,to=[], fps=None,m=M):
+    timestr = time.strftime('Created on %Y-%m-%d %H:%M:%S', time.localtime())
+    c='\n'.join([timestr,c])
     f,h,n,p = m[0], m[1],m[3],m[6]
     pt=int(m[2])
     if to:
