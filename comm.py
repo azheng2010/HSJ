@@ -19,11 +19,11 @@ if not os.path.exists(txtpath):os.makedirs(txtpath)
 if not os.path.exists(logpath):os.makedirs(logpath)
 if not os.path.exists(confpath):os.makedirs(confpath)
 global M
-version='0.3.1'
+version='0.3.2'
 logger_level='warning'#日志显示级别debug,info不会显示'debug'#
-tk_col = {'qid':0, 
- 'stem':1,  'options':5,  'answer_txt':2, 
- 'answer_symbol':4,  'pinyin':3, 
+tk_col = {'qid':0,
+ 'stem':1,  'options':5,  'answer_txt':2,
+ 'answer_symbol':4,  'pinyin':3,
  'qtype':6,  'mark':7,}
 tiku_db_col = ['qid', 'stem', 'options', 'answer_txt', 'answer_symbol',
                'parsing', 'qtype', 'company', 'origin', 'mark',]

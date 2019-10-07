@@ -460,7 +460,10 @@ class MyWatchDog:
                         print('killed %10s %-10s'%(x.name(),x.pid))
             kill_proc(['conhost.exe','cmd.exe'])
     def choice(self):
-        print(boxmsg('version : %s'%version))
+        print("-"*16)
+        print('当前版本 : %s'%version)
+        self.the_latest_version()
+        print("-"*16)
         fp = confpath + 'choice.txt'
         with open(fp, 'r', encoding='utf-8') as (f):
             txt = f.read()
@@ -559,6 +562,14 @@ class MyWatchDog:
                     pass
                 else:
                     print('输入错误！')
+    def the_latest_version(self):
+        try:
+            r = requests.get(urls['version1'])
+        except:
+            r = requests.get(urls['version2'])
+        if r.status_code == 200:
+            version = r.text.strip()
+            print('最新版本 : %s' % version)
     def check_user_date(self):
         print('正在验证用户及有效期……')
         try:

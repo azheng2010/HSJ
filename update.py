@@ -53,7 +53,6 @@ def updater_py_file(new_src,old_dst,file_type='.py'):
     lst=filter_file_type(new_src,file_type=file_type)
     if lst:
         for x in lst:
-            if x=='main.py':continue
             newfp=os.path.join(new_src,x)
             oldfp=os.path.join(old_dst,x)
             shutil.copyfile(newfp,oldfp,follow_symlinks=False)

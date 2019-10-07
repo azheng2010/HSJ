@@ -2,7 +2,7 @@
 
 #### 介绍
 HSJ辅助工具
-当前版本: 0.3.1
+当前版本: 0.3.2
 
 #### 软件架构
 软件架构说明
@@ -15,9 +15,9 @@ HSJ辅助工具
 3. 下载本脚本程序
     首次下载，可用一键下载程序脚本：
     wget https://gitee.com/wzh2018/HSJ/repository/archive/master.zip -O HSJ-master.zip && unzip -o HSJ-master.zip && rm HSJ-master.zip
-    
+
     或者
-    
+
     wget https://github.com/azheng2010/HSJ/archive/master.zip -O HSJ-master.zip && unzip -o HSJ-master.zip && rm HSJ-master.zip
 4. 加载并运行脚本程序
 
@@ -147,3 +147,7 @@ HSJ辅助工具
 ##### version 0.3.1 更新日期：2019-10-05
 1. 修改了正常匹配中的逻辑错误bug
 2. 新增邮件创建时间标签
+
+##### version 0.3.2 更新日期：2019-10-07
+1. 优化了更新程序模块(main.py也更新)
+2. 新增首次运行提示最新版本信息
