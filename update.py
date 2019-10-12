@@ -128,5 +128,4 @@ def overwriteconf(oldfn,newfn):
     with open(newfn,'w',encoding='utf-8') as f:
         conf.write(f)
 if __name__=="__main__":
-    unpackfiles('HSJ.zip',unpack_dir='d:\\123',zipdir='D:\\MyPython\\HSJ_release\\HSJ_zip')
     pass

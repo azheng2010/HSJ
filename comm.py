@@ -4,6 +4,7 @@ import re
 import requests,csv
 from html.parser import HTMLParser
 import os, time, json, base64, platform
+import demjson
 import socket, urllib.request
 from myaes import MYAES
 from pypinyin import pinyin,Style
@@ -19,7 +20,8 @@ if not os.path.exists(txtpath):os.makedirs(txtpath)
 if not os.path.exists(logpath):os.makedirs(logpath)
 if not os.path.exists(confpath):os.makedirs(confpath)
 global M
-version='0.3.2'
+global QUYjson
+version='0.3.4'
 logger_level='warning'#日志显示级别debug,info不会显示'debug'#
 tk_col = {'qid':0,
  'stem':1,  'options':5,  'answer_txt':2,
@@ -30,7 +32,7 @@ tiku_db_col = ['qid', 'stem', 'options', 'answer_txt', 'answer_symbol',
 app=MYAES()
 with open(confpath+'use.db','r') as f:
     txt=f.read().strip()
-urls=json.loads(app.decrypt(txt))
+urls=demjson.decode(app.decrypt(txt))
 def boxprint(outtxt, CN_zh=False):
     txt = outtxt.strip()
     lst = ['  ' + x + '  ' for x in txt.splitlines()]
@@ -434,15 +436,18 @@ def get_email_data():
                      de.decrypt(x[5]),de.decrypt(x[6]),
                      de.decrypt(x[7])] for i,x in enumerate(lst) if i>0]
     return data_lst[1]
-def make_use_file():
-    app=MYAES()
-    with open('use.db未加密信息.txt','r') as f:
-        txt=f.read().strip()
-    with open(confpath+'use.db','w',encoding='utf-8') as f1:
-        f1.write(app.encrypt(txt))
-    with open('use.db','w',encoding='utf-8') as f2:
-        f2.write(app.encrypt(txt))
-    print('加密网址库use.db已生成！')
+def get_qiniu_conf():
+    try:
+        r = requests.get(urls["giteeqny"])
+    except:
+        r = requests.get(urls["githubqny"])
+    if r.status_code == 200:
+        j = r.json()
+        de=MYAES()
+        for k in j.keys():
+            j[k]=de.decrypt(j[k])
+        return j
 M=get_email_data()
+QNYjson=get_qiniu_conf()
 if __name__ == '__main__':
     pass

@@ -80,11 +80,4 @@ class MYAES():
         else:
             return text
 if __name__ == '__main__':
-    myaes=MYAES()
-    s='中文测试明文字符串this is a test string'
-    print('源字符串:',s)
-    e = myaes.encrypt(s)  
-    print("加密:", e)
-    d = myaes.decrypt(e)  
-    print("解密:", d)
-    print('key',myaes.key)
+    pass

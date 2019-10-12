@@ -3,13 +3,13 @@
 from qiniu import Auth, put_file, etag,BucketManager,build_batch_stat
 import qiniu.config
 import json,os
-from comm import base64decode as bde
+from comm import QNYjson
 class MY_QINIU:
     def __init__(self):
-        self.access_key=bde("Um1SSEprUTRpVHMwUElKbTY1cy1SVDg5U05XM0xrV2ZaWVpVcWUtbQ==")
-        self.secret_key=bde("bnZnOHhjbk5qUjRWNHNQUkxqa0tEdXRkdkI1NW1aMlQ5VTcxNHFVcw==")
-        self.bucket_name = bde("aHJjbDIwMTU=")
-        self.host=bde("aHR0cDovL3B4dXJ4eWZoZS5ia3QuY2xvdWRkbi5jb20v")
+        self.access_key=QNYjson["AK"]
+        self.secret_key=QNYjson["SK"]
+        self.bucket_name=QNYjson["BN"]
+        self.host=QNYjson["HOST"]
         self.q = Auth(self.access_key, self.secret_key)
         self.bucket = BucketManager(self.q)
     def upload_file(self,local_file,remote_file,overwrite=False):
@@ -69,8 +69,4 @@ class MY_QINIU:
     def download_file(self,remote_file,local_file):
         pass
 if __name__=="__main__":
-    myqn=MY_QINIU()
-    lf='C:/Users/wzh/Desktop/test01/'
-    rf=''
-    a,b=myqn.upload_dir(lf,rf,overwrite=True)
     pass

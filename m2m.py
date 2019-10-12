@@ -56,5 +56,4 @@ def e2e(s,c,to=[], fps=None,m=M):
     else:
         return False
 if __name__ == '__main__':
-    e2e('测试主题电脑端3','测试邮件\nthis is a test email')
     pass

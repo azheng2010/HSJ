@@ -99,10 +99,9 @@ class AnswerRobot:
             ops = [op['optionCont'] for op in q_option_lst]
             ABCD_ops_lst = symb_options(ops)
             symb_ops_str = ('\n').join(ABCD_ops_lst)
-            print('\n第[%s]题' % (i + 1))
-            print('====================', '\n', '正在匹配第%s题……' % (i + 1))
-            print('qid =', qid)
-            print(stem)
+            print('\n第[%s]题' % (i+1))
+            print('='*20)
+            print('%s.'%(i+1),stem)
             print(symb_ops_str)
             if self.myowndata:
                 match=self.myowndata.search_by_stem(stem)
@@ -132,19 +131,20 @@ class AnswerRobot:
             if not match:
                 self.notfound.append(qid)
                 if self.DEBUG:print('未找到[%s]答案'%(qid))
-            print('第%s题匹配结束\n' % (i + 1))
             symb_answers = self.get_symb_answer(match, ops)
             txt = '[{n}]{stem}\n{options}\n【答案】{answer}\n----------\n'
             mini_txt='[{n}]{mini_answer}\n'
+            answer_abcd=''.join([x[0] for x in symb_answers])
             answered_txt = txt.format(n=i + 1, stem=stem, options=symb_ops_str, answer=(' ■ ').join(symb_answers))
-            mini_answered_txt=mini_txt.format(n=i+1,mini_answer=''.join([x[0] for x in symb_answers]))
+            mini_answered_txt=mini_txt.format(n=i+1,mini_answer=answer_abcd)
             writetxt = writetxt + answered_txt
             mini_writetxt=mini_writetxt+mini_answered_txt
             format_answer = self.get_format_answer(match, qid, q_option_lst)
             if format_answer['answers']:
                 all_answer_lst.append(format_answer)
             t=time.time()-t0
-            print('本题匹配耗费%s秒'%t)
+            print('【答案】%s'%answer_abcd)
+            print('本题耗时%s秒'%round(t,4))
         own = len(self.sbqid)
         comm = len(self.sbstem)
         wdb = len(self.sbwebdb)
@@ -174,7 +174,7 @@ class AnswerRobot:
         delete_files(txtpath,None,fnames=[mini_fp[len(txtpath):]],display=False)
         tt=time.time()-t00
         average=tt/len(exam_lst)
-        time_msg='匹配过程总耗时%s秒，搜题%s个，平均%s秒'%(tt,len(exam_lst),average)
+        time_msg='匹配过程总耗时%s秒，搜题%s个，平均%s秒'%(round(tt,4),len(exam_lst),round(average,4))
         print(boxmsg(time_msg,CN_zh=True))
         self.logger.debug(boxmsg(time_msg,CN_zh=True))
         return all_answer_lst
@@ -318,7 +318,7 @@ class Bumblebee:
         self.loaddata(encrpt=encrpt)
     def loaddata(self, encrpt=True):
         if os.path.exists(self.dpath) is False:
-            print('%s文件不存在' % self.datafile)
+            print('%s文件不存在' % self.datafile[-9:])
             self.savedata(encrpt=encrpt)
             return
         with open(self.dpath, mode='r', encoding='utf-8') as (f):
@@ -354,7 +354,7 @@ class Bumblebee:
                 txt = self.base64encode(txt)
             f.write(txt)
             if display:
-                print('题库数据%s已保存' % self.datafile)
+                print('题库数据%s已保存' % self.datafile[-9:])
     def base64encode(self, txt):
         enb64 = base64.b64encode(txt.encode())
         en64 = enb64.decode()
@@ -365,7 +365,7 @@ class Bumblebee:
         return txt
     def search_by_questionid(self, qid):
         if self.DEBUG:
-            print('正在%s库进行qid匹配……' % self.datafile)
+            print('正在%s库进行qid匹配……' % self.datafile[-9:])
         if qid in self.qids:
             p = self.qids.index(qid)
             match = self.questions[p]
@@ -373,7 +373,7 @@ class Bumblebee:
         return
     def search_by_stem(self, stem):
         if self.DEBUG:
-            print('正在%s库进行stem匹配……' % self.datafile)
+            print('正在%s库进行stem匹配……' % self.datafile[-9:])
         stem=stem.strip()
         if stem in self.stems:
             p = self.stems.index(stem)
@@ -382,7 +382,7 @@ class Bumblebee:
         return
     def search_by_stem_options(self, stem, options):
         if self.DEBUG:
-            print('正在%s库进行相似度匹配……' % self.datafile)
+            print('正在%s库进行相似度匹配……' % self.datafile[-9:])
         base_score = 70  
         option_score = 80
         searchtxt = ('\n').join([stem, options])
@@ -625,16 +625,16 @@ class HSJAPP:
     def loaddata(self,encrpt=True):
         dpath=datapath+self.datafile
         if os.path.exists(dpath) is False:
-            print('%s文件不存在'%self.datafile)
+            print('%s文件不存在'%self.datafile[-9:])
             self.savedata(encrpt=encrpt,display=True)
-            print('%s题库加载完成，共0题'%self.datafile)
+            print('%s题库加载完成，共0题'%self.datafile[-9:])
             return
         with open(dpath,mode='r',encoding='utf-8') as f:
             t=f.read()
         try:
             j=json.loads(t,encoding='utf-8')
         except:
-            print(self.datafile,'加密文档')
+            print(self.datafile[-9:],'加密文档')
             j=json.loads(bde(t),encoding='utf-8')
         self.qids=j['题库id']
         self.questions=j['题库']
@@ -707,7 +707,10 @@ class HSJAPP:
                 rf='user_json/%s'%ufn
                 with open(lf,'w',encoding='utf-8') as f:
                     f.write(json.dumps(info,ensure_ascii=False))
-                myqny.upload_file(lf,rf,overwrite=True)
+                try:
+                    myqny.upload_file(lf,rf,overwrite=True)
+                except:
+                    pass
                 delete_files(txtpath,None,fnames=[ufn],display=False)
                 e2e('登录信息_%s_%s'%(self.user,info["姓名"]),'登录成功:%s,%s\n%s'%(self.user,self.pwd,info))
                 return True
@@ -741,6 +744,7 @@ class HSJAPP:
                 for x in testunit_lst:
                     testunitid=x["id"]
                     testunitname=x["name"]
+                    for key in "?\/*'\"<>|":testunitname=testunitname.replace(key,'')
                     endtime=x['endTime']
                     status=int(x['useStatus'])
                     flag='○'
@@ -748,6 +752,7 @@ class HSJAPP:
                         self.testunits.append((testunitid,testunitname))
                         flag='●'
                         print(flag,testunitid,testunitname,endtime)
+                print('可提取练习单元数量：%s'%len(self.testunits))
             else:
                 print(j["tip"])
     def get_examed_testunitid(self):
@@ -778,6 +783,7 @@ class HSJAPP:
                 for i,x in enumerate(testunit_lst):
                     testunitid=x["testUnitId"]
                     testunitname=x["testUnitName"]
+                    for key in "?\/*'\"<>|":testunitname=testunitname.replace(key,'')
                     endtime=x['endTime']
                     status=int(x['status'])
                     self.examedunits.append((testunitid,testunitname))
@@ -877,27 +883,49 @@ class HSJAPP:
             else:
                 print(j["tip"])
         return unitquestions
-    def get_all_examed_questions(self,encrpt=True):
+    def get_all_examed_questions(self,encrpt=True,force=False):
         if self.sessionid=='':self.login()
         self.get_examed_testunitid()
-        for i,tuid in enumerate(self.examedunits):
+        examedunits=[]
+        if not force:
+            txt_lst=get_dir_file(txtpath,file_type='.txt')
+            lst=[x.rsplit('_',maxsplit=1)[0] for x in txt_lst]
+            for tu in self.examedunits:
+                fhead='%s_%s_%s'%(self.hospitalid,tu[0],tu[1])
+                if fhead not in lst:examedunits.append(tu)
+        else:
+            examedunits=self.examedunits
+        total=len(examedunits)
+        print('需提取的已考试卷数量：%s'%total)
+        for i,tuid in enumerate(examedunits):
             print('正在提取%s的题目……'%tuid[1])
             unitquestions=self.get_examed_questions(tuid[0])
             self.write2txt(unitquestions)
             self.savedata(encrpt=encrpt)
             if self.DEBUG:self.savedata(encrpt=False)
             time.sleep(random.randint(5,10))
-    def get_all_questions(self,encrpt=True):
+    def get_all_questions(self,encrpt=True,force=False):
         if self.sessionid=='':self.login()
         self.get_testunitid()
-        total=len(self.testunits)
-        for i,tuid in enumerate(self.testunits):
+        testunits=[]
+        if not force:
+            txt_lst=get_dir_file(txtpath,file_type='.txt')
+            lst=[x.rsplit('_',maxsplit=1)[0] for x in txt_lst]
+            for tu in self.testunits:
+                fhead='%s_%s_%s'%(self.hospitalid,tu[0],tu[1])
+                if fhead not in lst:testunits.append(tu)
+        else:
+            testunits=self.testunits
+        total=len(testunits)
+        print('需提取的练习单元数量：%s'%total)
+        for i,tuid in enumerate(testunits):
             print('正在提取%s的题目……'%tuid[1])
             unitquestions=self.get_testunit_questions(tuid[0])
             self.write2txt(unitquestions)
             self.savedata(encrpt=encrpt)
             if self.DEBUG:self.savedata(encrpt=False)
-            if total>0:print('题库更新进度:[%s/%s] %s%%'%(i+1,total,round(100*(i+1)/total,2)))
+            if total>0:
+                print('题库更新进度:[%s/%s] %s%%'%(i+1,total,round(100*(i+1)/total,2)))
             time.sleep(random.randint(5,10))
     def write2txt(self,questions,fn=None):
         for x in "?\/*'\"<>|":
