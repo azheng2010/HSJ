@@ -69,4 +69,5 @@ class MY_QINIU:
     def download_file(self,remote_file,local_file):
         pass
 if __name__=="__main__":
+    myqn=MY_QINIU()
     pass

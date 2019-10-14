@@ -535,6 +535,8 @@ class MyWatchDog:
     def update_questions(self):
         myapp=HSJAPP(self.user,pwd=self.pwd)
         myapp.get_all_questions(encrpt=True)
+        myapp.get_all_examed_questions()
+        myapp.get_all_course()
     def check_version(self):
         print('正在检查版本信息……')
         try:
@@ -1041,7 +1043,6 @@ class HSJAPP:
                 self.unitid=courseid
                 for x in qlst:
                     qid,stem,answertxt,answer2,options,type_name=parser_course(x)
-                    self.count+=1
                     stempinyin=str_to_pinyin(stem)
                     unitquestions.append([qid,stem,answertxt,stempinyin,answer2,options,type_name,classification])
             elif j['tip']=='用户需要登录!':
@@ -1121,6 +1122,7 @@ class HSJAPP:
                         self.qids.append(qid)
                         self.questions.append([qid,stem,answertxt,stempinyin,answer2,options,type_name,classification])
                     unitquestions.append([qid,stem,answertxt,stempinyin,answer2,options,type_name,classification])
+                    print('已处理%s,当前题库共有%s题'%(self.count,len(self.qids)))
                 self.write2txt(unitquestions)
             elif j['tip']=='用户需要登录!':
                 self.login()
@@ -1135,16 +1137,16 @@ class HSJAPP:
             courseid=x[0]
             coursename=x[1]
             self.get_course_detail(courseid)
-            for y in range(2):
-                self.get_course_test_questions(courseid,coursename)
-                answerlst=[]
-                print('-----暂停60秒-----')
-                time.sleep(60)
-                self.submit_course_answer(courseid,answerlst)
-                self.get_course_result_questions(courseid,coursename)
-            print('=====暂停60秒=====')
-            time.sleep(60)
+            self.get_course_test_questions(courseid,coursename)
+            answerlst=[]
+            print('-----随机暂停15-20秒-----')
+            time.sleep(random.randint(15,20))
+            self.submit_course_answer(courseid,answerlst)
+            self.get_course_result_questions(courseid,coursename)
+            print('=====随机暂停15-20秒=====')
+            time.sleep(random.randint(15,20))
         self.write2txt(self.questions,fn=txtpath+'随堂练习.txt')
+        self.savedata(encrpt=True)
         pass
 if __name__ == '__main__':
     pass

@@ -21,7 +21,7 @@ if not os.path.exists(logpath):os.makedirs(logpath)
 if not os.path.exists(confpath):os.makedirs(confpath)
 global M
 global QUYjson
-version='0.3.4'
+version='0.3.5'
 logger_level='warning'#日志显示级别debug,info不会显示'debug'#
 tk_col = {'qid':0,
  'stem':1,  'options':5,  'answer_txt':2,
