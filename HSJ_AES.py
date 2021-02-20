@@ -31,8 +31,16 @@ class AESCipher:
         en64=enb64.decode()
         return en64
     def base64decode(self,en64):
+        if type(en64) is bytes:en64=en64.decode()
         btxt=base64.b64decode(en64.encode())
         txt=btxt.decode()
         return txt
 if __name__ == '__main__':
+    e = AESCipher()
+    secret_data = e.base64encode("中文")
+    enc_str = e.encrypt(secret_data)
+    print('enc_str: ' + enc_str.decode())
+    dec_str = e.decrypt(enc_str)
+    dec_str=e.base64decode(dec_str)
+    print('dec str: ' + dec_str)
     pass

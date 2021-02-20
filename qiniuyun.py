@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 from qiniu import Auth, put_file, etag,BucketManager,build_batch_stat
 import qiniu.config
-import json,os
+import json,os,requests
 from comm import QNYjson
 class MY_QINIU:
     def __init__(self):
@@ -69,5 +69,4 @@ class MY_QINIU:
     def download_file(self,remote_file,local_file):
         pass
 if __name__=="__main__":
-    myqn=MY_QINIU()
     pass

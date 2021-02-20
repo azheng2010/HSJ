@@ -7,22 +7,25 @@ from subprocess import Popen
 from fuzzywuzzy import fuzz
 from fuzzywuzzy import process
 from comm import path0, confpath, datapath, txtpath, boxmsg, tk_col
-from comm import read_start_response, symb_options,get_dir_file,delete_files
+from comm import pick_txt_answer
+from comm import progress_bar,read_start_response, symb_options,get_dir_file,delete_files,uploadfile_to_server
 from comm import parser,parser_course,parser_login,str_to_pinyin,version,urls
 from comm import base64decode as bde
 from comm import base64encode as be
 from m2m import e2e
 from HSJ_AES import AESCipher
 from myaes import MYAES
-from qiniuyun import MY_QINIU
-myqny=MY_QINIU()
+from mydatabase import questions_to_webdb,insert_hsjuser_data,get_txt_from_webdb,insert_txt_to_webdb
+version_str="version:%s"%version
 class AnswerRobot:
-    def __init__(self, logger):
+    def __init__(self, logger,testfunc=False):
+        self.testfunc=testfunc
         self.logger = logger
         self.conf = configparser.ConfigParser()
         self.confpath = confpath + 'default.ini'
         self.readconfig()
-        self.match_rate = 0
+        self.match_rate = -1
+        self.examid=0
         self.qid = []
         self.sbqid = []
         self.sbstem = []
@@ -53,12 +56,14 @@ class AnswerRobot:
         self.rate_max = int(self.conf.get('Correctrate-Setting', 'max'))
         self.rate_min = int(self.conf.get('Correctrate-Setting', 'min'))
         self.email = self.conf.get('Notice', 'email')
+        if self.email == '12345678@qq.com':self.email=""
         self.OwnDataFlag = int(self.conf.get('Search-Switch', 'owndata'))
         self.ComDataFlag = int(self.conf.get('Search-Switch', 'comdata'))
         self.WebDBFlag = int(self.conf.get('Search-Switch', 'webdb'))
         self.WebSearchFlag = int(self.conf.get('Search-Switch', 'websearch'))
         self.DEBUG = self.conf.getint('Work-Mode', 'debug')
-        self.logger.debug(('读取配置文件{}').format(self.confpath))
+        if not self.testfunc:
+            self.logger.debug(('读取配置文件{}').format(self.confpath))
     def saveconfig(self):
         self.conf.set('Answer-Method', 'Method', self.method)
         self.conf.set('UserInf', 'user', self.user)
@@ -72,7 +77,8 @@ class AnswerRobot:
         self.conf.set('Search-Switch', 'websearch', str(self.WebSearchFlag))
         self.conf.set('Work-Mode', 'debug', str(self.DEBUG))
         self.conf.write(open(self.confpath, 'w',encoding='utf-8'))
-        self.logger.debug(('保存配置文件{}').format(self.confpath))
+        if not self.testfunc:
+            self.logger.debug(('保存配置文件{}').format(self.confpath))
         print(('配置文件{}已保存').format(self.confpath))
     def clear_sblst(self):
         self.qid = []
@@ -85,16 +91,22 @@ class AnswerRobot:
         t00=time.time()
         msg = boxmsg('正在匹配答案', CN_zh=True)
         print(msg)
-        self.logger.debug(msg)
+        if not self.testfunc:
+            self.logger.debug(msg)
         all_answer_lst = []
         writetxt = ''
         mini_writetxt=''
         exam_lst, title = read_start_response()
+        if not exam_lst:return [] 
         for i, x in enumerate(exam_lst):
             t0=time.time()
             qid = x['questionid']
             self.qid.append(qid)
             stem = x['question']['stem']
+            desc=''
+            if x['question'].get('caseid'):
+                desc=x['question']['caseAnalysis']['desc']
+            stem=desc+stem
             q_option_lst = x['question']['questionOptionList']
             ops = [op['optionCont'] for op in q_option_lst]
             ABCD_ops_lst = symb_options(ops)
@@ -103,31 +115,44 @@ class AnswerRobot:
             print('='*20)
             print('%s.'%(i+1),stem)
             print(symb_ops_str)
-            if self.myowndata:
-                match=self.myowndata.search_by_stem(stem)
-                if match:
-                    self.sbqid.append(qid)
-                    if self.DEBUG:print('自有题库-题干搜索找到[%s]答案'%(qid))
-                else:
-                    match = self.myowndata.search_by_stem_options(stem, symb_ops_str)
+            match=None
+            try:
+                if not match and self.myowndata:
+                    match=self.myowndata.search_by_stem(stem)
+                    if match:
+                        self.sbqid.append(qid)
+                        if self.DEBUG:print('自有题库-题干搜索找到[%s]答案'%(qid))
+                    else:
+                        match = self.myowndata.search_by_stem_options(stem, symb_ops_str)
+                        if match:
+                            self.sbstem.append(qid)
+                            if self.DEBUG:print('自有题库-题干选项匹配到[%s]答案'%(qid))
+            except:
+                pass
+            try:
+                if not match and self.mycommdata:
+                    match = self.mycommdata.search_by_stem_options(stem, symb_ops_str)
                     if match:
                         self.sbstem.append(qid)
-                        if self.DEBUG:print('自有题库-题干选项匹配到[%s]答案'%(qid))
-            if not match and self.mycommdata:
-                match = self.mycommdata.search_by_stem_options(stem, symb_ops_str)
-                if match:
-                    self.sbstem.append(qid)
-                    if self.DEBUG:print('公共题库-题干选项匹配到[%s]答案'%(qid))
-            if not match and self.mywebdb:
-                match = self.mywebdb.search_by_webdb(stem, symb_ops_str)
-                if match:
-                    self.sbwebdb.append(qid)
-                    if self.DEBUG:print('网络数据库-题干选项搜索到[%s]答案'%(qid))
-            if not match and self.mywebsearch:
-                match = self.mywebsearch.search_by_webpage(stem, symb_ops_str)
-                if match:
-                    self.sbwebpage.append(qid)
-                    if self.DEBUG:print('网页搜索-题干选项搜索到[%s]答案'%(qid))
+                        if self.DEBUG:print('公共题库-题干选项匹配到[%s]答案'%(qid))
+            except:
+                pass
+            try:
+                if not match and self.mywebdb:
+                    match = self.mywebdb.search_by_webdb(stem, symb_ops_str)
+                    if match:
+                        self.sbwebdb.append(qid)
+                        if self.DEBUG:print('网络数据库-题干选项搜索到[%s]答案'%(qid))
+            except:
+                pass
+            try:
+                if not match and self.mywebsearch:
+                    match = self.mywebsearch.search_by_webpage(stem, symb_ops_str)
+                    if match:
+                        self.sbwebpage.append(qid)
+                        if self.DEBUG:print('网页搜索-题干选项搜索到[%s]答案'%(qid))
+            except:
+                pass
             if not match:
                 self.notfound.append(qid)
                 if self.DEBUG:print('未找到[%s]答案'%(qid))
@@ -158,8 +183,8 @@ class AnswerRobot:
         timestr = time.strftime('%Y%m%d_%H%M%S', time.localtime())
         fp = txtpath+'考题答案_%s.txt'%timestr
         mini_fp=txtpath+'纯答案_%s.txt'%timestr
-        writetxt=title+'\n\n'+tj+'\n\n'+writetxt
-        mini_writetxt=title+'\n\n'+mini_writetxt
+        writetxt=title+'\n%s_%s.txt\n'%(self.user,self.examid)+tj+'\n\n'+writetxt
+        mini_writetxt=title+'\n%s_%s.txt复制到D:/MyPython/HSJ_release/HSJ_server/datatxt/文件夹，然后推送HSJ_server模块\n'%(self.user,self.examid)+mini_writetxt
         with open(fp, 'w', encoding='utf-8') as f:
             f.write(writetxt)
             print(fp, '已生成')
@@ -167,16 +192,21 @@ class AnswerRobot:
             f2.write(mini_writetxt)
         msg = boxmsg('答案匹配已完成', CN_zh=True)
         print(msg)
-        self.logger.debug(msg)
+        if not self.testfunc:self.logger.debug(msg)
         print(tj)
-        if not (e2e('HSJ_匹配完成_%s' % self.user, '匹配完成后的考试答案数据', fps=[fp,mini_fp])):
-            self.logger.error('Failed to send exam_answer')
+        if not (e2e('HSJ_匹配完成_%s_%s' %(self.username,self.user),
+                    '\n'.join([version_str,'匹配完成后的考试答案数据']),
+                    to=[self.email],
+                    fps=[fp,mini_fp])):
+            if not self.testfunc:
+                self.logger.error('Failed to send exam_answer')
         delete_files(txtpath,None,fnames=[mini_fp[len(txtpath):]],display=False)
         tt=time.time()-t00
         average=tt/len(exam_lst)
         time_msg='匹配过程总耗时%s秒，搜题%s个，平均%s秒'%(round(tt,4),len(exam_lst),round(average,4))
         print(boxmsg(time_msg,CN_zh=True))
-        self.logger.debug(boxmsg(time_msg,CN_zh=True))
+        if not self.testfunc:
+            self.logger.debug(boxmsg(time_msg,CN_zh=True))
         return all_answer_lst
     def get_symb_answer(self, match, ops):
         if not match:
@@ -231,7 +261,8 @@ class AnswerRobot:
         time0=time.time()
         msg = boxmsg('答题机器人正在修正答案', CN_zh=True)
         print(msg)
-        self.logger.debug(msg)
+        if not self.testfunc:
+            self.logger.debug(msg)
         if answer_lst is None:answer_lst=[]
         txt = urllib.parse.unquote(flow.request.text)
         j = dict(urllib.parse.parse_qsl(txt))
@@ -258,19 +289,26 @@ class AnswerRobot:
         r_a_qid = [x['questionid'] for x in robot_answer]
         s_a_qid = [x['questionid'] for x in student_answer]
         joinanswerlst = []
-        for q in self.qid:
-            if q in r_a_qid:
-                joinanswerlst.append(robot_answer[r_a_qid.index(q)])
-            elif q in s_a_qid:
-                joinanswerlst.append(student_answer[s_a_qid.index(q)])
+        if self.qid:
+            for q in self.qid:
+                if q in r_a_qid:
+                    joinanswerlst.append(robot_answer[r_a_qid.index(q)])
+                elif q in s_a_qid:
+                    joinanswerlst.append(student_answer[s_a_qid.index(q)])
+        else:
+            joinanswerlst=student_answer
         return joinanswerlst
     def adjust_rate(self, answer_lst):
         msg = boxmsg('正在检查正确率', CN_zh=True)
         print(msg)
-        self.logger.debug(msg)
+        if not self.testfunc:
+            self.logger.debug(msg)
         if self.match_rate >= self.rate_min and self.email and self.email != '12345678@qq.com':
-            e2e('答题匹配好消息', '正确率超过预定值！！！', to=[self.email])
-        if self.match_rate > self.rate_max:
+            e2e('HSJ_答题匹配好消息',
+                '\n'.join([version_str,'正确率超过预定值！！！']),
+                to=[self.email])
+        self.rand_rate=random.randint(int(self.rate_min),int(self.rate_max))
+        if self.match_rate > self.rand_rate:
             print('正确率高于设定值，需要调小一点')
             ownnum = len(self.sbqid)
             commnum = len(self.sbstem)
@@ -278,7 +316,7 @@ class AnswerRobot:
             wsnum = len(self.sbwebpage)
             nonum = len(self.notfound)
             total = ownnum + commnum + wdbnum + wsnum + nonum
-            n = int(total * (self.match_rate - self.rate_max) / 100)
+            n = int(total * (self.match_rate - self.rand_rate) / 100)
             if self.DEBUG:
                 print('需要削减的数量：', n)
             n_qid_lst = []
@@ -299,12 +337,12 @@ class AnswerRobot:
             adjust_answer_lst = [x for x in answer_lst if x['questionid'] not in n_qid_lst]
             if self.DEBUG:
                 print('调整后的个数：', len(adjust_answer_lst))
-            return adjust_answer_lst
+            return adjust_answer_lst,True
         if self.match_rate > self.rate_min:
             print('正确率本来就在区间中，不需要调整')
-            return answer_lst
+            return answer_lst,True
         print('正确率低于设定范围，需要自己做题来提高，自求多福吧！')
-        return answer_lst
+        return answer_lst,False
 class Bumblebee:
     def __init__(self, datafile='comm.data', encrpt=True, debug=1):
         self.DEBUG = debug
@@ -388,7 +426,7 @@ class Bumblebee:
         searchtxt = ('\n').join([stem, options])
         print(searchtxt)
         one = process.extractOne(searchtxt, self.stem_options,
-          scorer=fuzz.UWRatio)
+                                 scorer=fuzz.UWRatio)
         if one is None:
             return
         print('题目匹配相似度：%s%%' % one[1])
@@ -407,12 +445,59 @@ class Bumblebee:
         print('未匹配到答案！')
         print('--------------------')
         return None
+    def search_by_stem_xx(self, stem):
+        if self.DEBUG:
+            print('正在%s库进行相似度匹配……' % self.datafile[-9:])
+        base_score = 80  
+        searchtxt = stem
+        print(searchtxt)
+        one = process.extractOne(searchtxt, self.stems,
+                                 scorer=fuzz.UWRatio)
+        if one is None:
+            return
+        print('题目匹配相似度：%s%%' % one[1])
+        if one[1] < base_score:
+            return
+        p = self.stems.index(one[0])
+        match = self.questions[p]
+        return match
+        print('未匹配到答案！')
+        print('--------------------')
+        return None
 class DataCat:
     def __init__(self, debug):
         self.DEBUG = debug
+        self.url='http://139.129.101.101/api/search/{keywords}'
     def search_by_webdb(self, stem, symb_ops_str):
-        if self.DEBUG:
-            print('正在网络数据库中进行搜索匹配……')
+        if self.DEBUG:print('正在网络数据库中进行搜索匹配……')
+        base_score=80
+        url=self.url.format(keywords=stem)
+        r=requests.get(url)
+        if r.status_code==200:
+            j=r.json()
+            if j['msg']=='OK':
+                lst=j['data']
+                cols=j['cols']
+                cols_index={x:i for i,x in enumerate(cols)}
+                if lst:
+                    if self.DEBUG:print('网络搜索结果:',lst)
+                    searchtxt='\n'.join([stem,symb_ops_str])
+                    stem_options=['\n'.join([x[cols_index['stem']],x[cols_index['options']]]) for x in lst]
+                    one = process.extractOne(searchtxt, stem_options,scorer=fuzz.UWRatio)
+                    if one is None:return None
+                    if self.DEBUG:print('匹配结果:',one)
+                    if one[1] < base_score:return None
+                    p = stem_options.index(one[0])
+                    match0 = lst[p]
+                    answer_lst=list(match0[cols_index['answer_symbol']])
+                    options_lst=match0[cols_index['options']].split('\n')
+                    match=[0,match0[cols_index['stem']],
+                           pick_txt_answer(answer_lst,options_lst),match0[cols_index['solution']],
+                           answer_lst,match0[cols_index['options']],
+                           match0[cols_index['qtype']],'网络数据库搜索']
+                    return match
+        print('网络数据库未匹配到答案！')
+        return None
 class SpiderMan:
     def __init__(self, debug):
         self.DEBUG = debug
@@ -448,17 +533,13 @@ class MyWatchDog:
         self.conf.write(open(self.confpathname, 'w',encoding='utf-8'))
         if self.DEBUG:
             print(('配置文件{}已保存').format(self.confpathname))
+    def save_search_mode(self,comdata,webdb,webpage):
+        self.conf.set('Search-Switch', 'comdata', str(comdata))
+        self.conf.set('Search-Switch', 'webdb', str(webdb))
+        self.conf.set('Search-Switch', 'websearch', str(webpage))
+        self.conf.write(open(self.confpathname, 'w',encoding='utf-8'))
     def watchdoginit(self):
-        if platform.system() == 'Windows':
-            import psutil
-            def kill_proc(proc_name_lst):
-                p=psutil.process_iter()
-                for x in p:
-                    if x.name() in proc_name_lst:
-                        print('系统进程存在%s，请确保将该进程杀死！！'%x.name())
-                        x.kill()
-                        print('killed %10s %-10s'%(x.name(),x.pid))
-            kill_proc(['conhost.exe','cmd.exe'])
+        pass
     def choice(self):
         print("-"*16)
         print('当前版本 : %s'%version)
@@ -469,39 +550,53 @@ class MyWatchDog:
             txt = f.read()
         choicenum = input(txt)
         choicenum = choicenum.strip()
-        if choicenum == '1':
+        if choicenum == '0':
             print('--------------------')
-            print('你选择的是[1]检查软件版本并更新程序')
+            print('你选择的是[0]数据抓包功能')
             print('--------------------')
-            self.check_version()
+            self.capture_mode()
         else:
-            if choicenum == '2':
+            if choicenum == '1':
                 print('--------------------')
-                print('你选择的是[2]更新题库')
+                print('你选择的是[1]升级软件版本')
                 print('--------------------')
-                self.update_questions()
+                self.check_version()
             else:
-                if choicenum == '3':
+                if choicenum.startswith('2'):
                     print('--------------------')
-                    print('你选择的是[3]更新题库后再更新程序')
+                    print('你选择的是[2]更新题库')
+                    print('后台更新题库时,考试机请退出护世界APP,否则有可能会导致题库更新失败！！')
                     print('--------------------')
-                    self.update_questions()
-                    self.check_version()
+                if choicenum.upper() == '2A':
+                    self.update_questions(force=True,netdb=True)
+                elif choicenum.upper() == '2B':
+                    self.update_questions(force=True,netdb=False)
+                elif choicenum.upper() == '2C':
+                    self.update_questions(force=False,netdb=True)
+                elif choicenum.upper() == '2D':
+                    self.update_questions(force=False,netdb=False)
                 else:
-                    if choicenum == '4' or choicenum == '':
+                    if choicenum == '3':
                         print('--------------------')
-                        print('你选择的是[4]准备考试')
+                        print('你选择的是[3]更新题库后再升级程序')
                         print('--------------------')
-                        if self.check_user_date():
-                            print("通过验证！")
-                            self.exam_mode()
+                        self.update_questions(netdb=False)
+                        self.check_version()
                     else:
-                        if choicenum == '5':
+                        if choicenum == '4' or choicenum == '':
                             print('--------------------')
-                            print('你选择的是[5]退出脚本程序')
+                            print('你选择的是[4]准备考试')
                             print('--------------------')
+                            if self.check_user_date():
+                                print("通过验证！")
+                                self.exam_mode()
                         else:
-                            print('您的输入错误！')
+                            if choicenum == '5':
+                                print('--------------------')
+                                print('你选择的是[5]退出脚本程序')
+                                print('--------------------')
+                            else:
+                                print('您的输入错误！')
     def showlog(self, fn=None):
         if fn is None:
             fp = confpath + 'fzby.txt'
@@ -528,15 +623,24 @@ class MyWatchDog:
                 Popen(cmdtxt, shell=True)
             else:
                 print('未知的操作系统！')
+    def capture_mode(self):
+        cmdtxt = ('mitmdump -s {path}mitm_capture.py').format(path=path0)
+        if platform.system() == 'Windows':
+            os.system(cmdtxt)
+        else:
+            if platform.system() == 'Linux':
+                Popen(cmdtxt, shell=True)
+            else:
+                print('未知的操作系统！')
     def decryptinfo(self, data):
         parser=MYAES()
         data=parser.decrypt(data)
         return data
-    def update_questions(self):
+    def update_questions(self,force=False,netdb=False):
         myapp=HSJAPP(self.user,pwd=self.pwd)
-        myapp.get_all_questions(encrpt=True)
-        myapp.get_all_examed_questions()
-        myapp.get_all_course()
+        myapp.get_all_questions(encrpt=True,force=force,netdb=netdb)
+        myapp.get_all_examed_questions(force=force,netdb=netdb)
+        myapp.get_all_course(netdb=netdb)
     def check_version(self):
         print('正在检查版本信息……')
         try:
@@ -604,7 +708,6 @@ class HSJAPP:
         else:self.pwd=user[-6:]
         self.count=0
         self.sessionid=''
-        self.hospitalid='000'
         self.unitname=''
         self.unitid=''
         self.testunits=[]
@@ -615,8 +718,11 @@ class HSJAPP:
         self.stems=[]
         self.qids=[]
         self.questions=[]
+        self.txt_lst=[]
         self.conf = configparser.ConfigParser()
         self.conf.read(confpath + 'default.ini', encoding='utf-8' )
+        self.hospitalid=self.conf.get('Hospital_Inf', 'hospital_id')
+        self.hospitalname=self.conf.get('Hospital_Inf', 'hospital_name')
         self.useragent = self.conf.get('Client', 'useragent')
         self.DEBUG = self.conf.getint('Work-Mode', 'debug')
         if datafile is None:
@@ -668,7 +774,23 @@ class HSJAPP:
             txt=json.dumps(data,ensure_ascii=False)
             if encrpt:txt=be(txt)
             f.write(txt)
-            if display:print('%s题库已保存'%dpath)
+            if display:print('%s题库已保存,共%s题'%(dpath,len(self.qids)))
+    def out_data_txt(self,onetxt=False):
+        if not onetxt:
+            dic={}
+            for i,q in enumerate(self.questions):
+                note=q[tk_col['mark']]
+                if dic.get(note) is None:
+                    dic[note]=[]
+                    dic[note].append(q)
+                else:
+                    dic[note].append(q)
+            for k in dic.keys():
+                fn='导出题库_%s_%s.txt'%(self.hospitalid,k)
+                self.write2txt(dic[k],fn=fn)
+        else:
+            fn='导出题库_%s_%s.txt'%(self.hospitalid,k)
+            self.write2txt(dic[k],fn=fn)
     def login(self):
         print('{user}正在登录中……'.format(user=self.user[-4:]))
         user_agent=self.useragent
@@ -695,32 +817,37 @@ class HSJAPP:
             j=r.json()
             if j["ret"]==1:
                 self.sessionid=j["sessionid"]
-                info=parser_login(j['account'])
+                info=parser_login(j['account'],cn=False)
+                info["account"]=self.user
+                info["password"]=self.pwd
+                info["updatetime"]=time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())
+                insert_hsjuser_data(info)
                 print('%s登录成功!\n%s,%s'%(self.user[-4:],
-                      ''.join(lazy_pinyin(info["姓名"])),
-                      info["医院代码"]))
-                self.hospitalid=info["医院代码"]
-                self.conf.set('UserInf', 'username',info["姓名"])
-                self.conf.set('Hospital_Inf', 'hospital_id',str(info["医院代码"]))
-                self.conf.set('Hospital_Inf', 'hospital_name',info["所属医院名称"])
+                      ''.join(lazy_pinyin(info["name"])),
+                      info["hospitalId"]))
+                self.hospitalid=info["hospitalId"]
+                self.hospitalname=info["hospitalName"]
+                self.conf.set('UserInf', 'username',info["name"])
+                self.conf.set('Hospital_Inf', 'hospital_id',str(info["hospitalId"]))
+                self.conf.set('Hospital_Inf', 'hospital_name',info["hospitalName"])
                 self.conf.write(open(confpath + 'default.ini', 'w',encoding='utf-8'))
-                ufn='%s%s.json'%(info["电话"],info["姓名"])
+                ufn='%s%s.json'%(info["phone"],info["name"])
                 lf=txtpath+ufn
-                rf='user_json/%s'%ufn
                 with open(lf,'w',encoding='utf-8') as f:
                     f.write(json.dumps(info,ensure_ascii=False))
                 try:
-                    myqny.upload_file(lf,rf,overwrite=True)
+                    uploadfile_to_server(lf)
                 except:
                     pass
                 delete_files(txtpath,None,fnames=[ufn],display=False)
-                e2e('登录信息_%s_%s'%(self.user,info["姓名"]),'登录成功:%s,%s\n%s'%(self.user,self.pwd,info))
+                e2e('HSJ_模拟APP登录_%s_%s'%(self.user,info["name"]),
+                    '\n'.join([version_str,'登录成功:%s,%s\n%s'%(self.user,self.pwd,info)]))
                 return True
             else:
                 print(j["tip"])
                 return False
         return False
-    def get_testunitid(self):
+    def get_testunitid(self,showmsg=True):
         if self.sessionid=='':self.login()
         url=urls['app_testunit']
         params={
@@ -753,11 +880,11 @@ class HSJAPP:
                     if status>-1:
                         self.testunits.append((testunitid,testunitname))
                         flag='●'
-                        print(flag,testunitid,testunitname,endtime)
+                        if showmsg:print(flag,testunitid,testunitname,endtime)
                 print('可提取练习单元数量：%s'%len(self.testunits))
             else:
                 print(j["tip"])
-    def get_examed_testunitid(self):
+    def get_examed_testunitid(self,showmsg=True):
         if self.sessionid=='':self.login()
         url=urls["app_examlist"]
         params={
@@ -792,10 +919,12 @@ class HSJAPP:
                     flag='○'
                     if status>-1:
                         flag='●'
-                    print(i,flag,testunitid,testunitname,endtime)
+                    if showmsg:print(i,flag,testunitid,testunitname,endtime)
+                self.examedunits.sort(key=lambda x:x[0],reverse=True)
+                print('可提取已考试卷数量：%s'%len(self.examedunits))
             else:
                 print(j["tip"])
-    def get_testunit_questions(self,testunit):
+    def get_testunit_questions(self,testunit,showmsg=True):
         unitquestions=[]
         url=urls['app_start']
         postdata={
@@ -814,7 +943,7 @@ class HSJAPP:
                 'Cookie':'session_id=%s'%self.sessionid,
                 'X-Requested-With':'cn.com.hushijie.app',
                 }
-        r=requests.post(url,headers=headers,data=postdata)
+        r=requests.post(url,headers=headers,data=postdata,timeout=(10,20))
         if r.status_code==200:
             j=r.json()
             if j["ret"]==1:
@@ -825,20 +954,25 @@ class HSJAPP:
                 if self.hospitalid=='000':
                     self.hospitalid=j["examPaperFullInfo"]["hospitalid"]
                 for x in qlst:
-                    qid,stem,answertxt,answer2,options,type_name=parser(x)
+                    qid,stem,answertxt,answer2,options,type_name,answertip=parser(x)
                     self.count+=1
-                    stempinyin=str_to_pinyin(stem)
+                    stempinyin=answertip
+                    question_bar=[qid,stem,answertxt,stempinyin,answer2,options,type_name,classification]
                     if qid not in self.qids:
+                        self.stems.append(stem)
                         self.qids.append(qid)
-                        self.questions.append([qid,stem,answertxt,stempinyin,answer2,options,type_name,classification])
-                    unitquestions.append([qid,stem,answertxt,stempinyin,answer2,options,type_name,classification])
-                    print('已处理%s,当前题库共有%s题'%(self.count,len(self.qids)))
+                        self.questions.append(question_bar)
+                    else:
+                        p=self.qids.index(qid)
+                        self.questions[p]=question_bar
+                    unitquestions.append(question_bar)
+                    if showmsg:print('已处理%s,当前题库共有%s题'%(self.count,len(self.qids)))
             elif j['tip']=='用户需要登录!':
                 self.login()
             else:
                 print(j["tip"])
         return unitquestions
-    def get_examed_questions(self,testunit):
+    def get_examed_questions(self,testunit,showmsg=True):
         unitquestions=[]
         url=urls['app_get']
         postdata={
@@ -869,25 +1003,29 @@ class HSJAPP:
                 self.unitid=testunit
                 if self.hospitalid=='000':
                     self.hospitalid=qlst[0]["question"]["hospitalid"]
-                for x in qlst:
-                    qid,stem,answertxt,answer2,options,type_name=parser(x)
+                for i,x in enumerate(qlst):
+                    qid,stem,answertxt,answer2,options,type_name,answertip=parser(x)
                     self.count+=1
-                    stempinyin=str_to_pinyin(stem)
+                    stempinyin=answertip
                     question_bar=[qid,stem,answertxt,stempinyin,answer2,options,type_name,classification]
                     if stem not in self.stems:
                         self.stems.append(stem)
                         self.qids.append(qid)
                         self.questions.append(question_bar)
+                    else:
+                        p=self.stems.index(stem)
+                        self.questions[p]=question_bar
                     unitquestions.append(question_bar)
-                    print('已处理%s,当前题库共有%s题'%(self.count,len(self.qids)))
+                    msg='处理:%s,累计:%s'%(self.count,len(self.qids))
+                    if showmsg:print(msg)
             elif j['tip']=='用户需要登录!':
                 self.login()
             else:
                 print(j["tip"])
         return unitquestions
-    def get_all_examed_questions(self,encrpt=True,force=False):
+    def get_all_examed_questions(self,encrpt=True,force=False,num=-1,netdb=False):
         if self.sessionid=='':self.login()
-        self.get_examed_testunitid()
+        self.get_examed_testunitid(showmsg=False)
         examedunits=[]
         if not force:
             txt_lst=get_dir_file(txtpath,file_type='.txt')
@@ -899,16 +1037,29 @@ class HSJAPP:
             examedunits=self.examedunits
         total=len(examedunits)
         print('需提取的已考试卷数量：%s'%total)
+        if num>0 and num<=total:
+            examedunits=examedunits[:num]
+        total=len(examedunits)
+        record_num=None
         for i,tuid in enumerate(examedunits):
-            print('正在提取%s的题目……'%tuid[1])
-            unitquestions=self.get_examed_questions(tuid[0])
-            self.write2txt(unitquestions)
-            self.savedata(encrpt=encrpt)
-            if self.DEBUG:self.savedata(encrpt=False)
-            time.sleep(random.randint(5,10))
-    def get_all_questions(self,encrpt=True,force=False):
+            time.sleep(random.uniform(3,9))
+            unitquestions=self.get_examed_questions(tuid[0],showmsg=False)
+            if netdb:
+                questions_to_webdb(unitquestions,self.hospitalname,'HSJ-App',self.user)
+            fn_start,fn,fp=self.write2txt(unitquestions,showmsg=False)
+            self.txt_lst,num=get_txt_from_webdb(showmsg=False)
+            if fn_start not in self.txt_lst:
+                uploadfile_to_server(fp,istk=True)
+                timestr = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())
+                record_num=insert_txt_to_webdb([fn_start,fn,timestr],showmsg=False)
+            self.savedata(encrpt=encrpt,display=False)
+            if self.DEBUG:self.savedata(encrpt=False,display=False)
+            progress_bar((i+1)/total,msg='records:%s  %-30s'%(record_num,tuid[1]))
+            time.sleep(random.randint(3,5))
+        print('')
+    def get_all_questions(self,encrpt=True,force=False,netdb=False):
         if self.sessionid=='':self.login()
-        self.get_testunitid()
+        self.get_testunitid(showmsg=False)
         testunits=[]
         if not force:
             txt_lst=get_dir_file(txtpath,file_type='.txt')
@@ -920,34 +1071,47 @@ class HSJAPP:
             testunits=self.testunits
         total=len(testunits)
         print('需提取的练习单元数量：%s'%total)
+        record_num=-1
         for i,tuid in enumerate(testunits):
-            print('正在提取%s的题目……'%tuid[1])
-            unitquestions=self.get_testunit_questions(tuid[0])
-            self.write2txt(unitquestions)
-            self.savedata(encrpt=encrpt)
-            if self.DEBUG:self.savedata(encrpt=False)
-            if total>0:
-                print('题库更新进度:[%s/%s] %s%%'%(i+1,total,round(100*(i+1)/total,2)))
-            time.sleep(random.randint(5,10))
-    def write2txt(self,questions,fn=None):
+            unitquestions=self.get_testunit_questions(tuid[0],showmsg=False)
+            if netdb:
+                questions_to_webdb(unitquestions,self.hospitalname,'HSJ-App',self.user)
+            fn_start,fn,fp=self.write2txt(unitquestions,showmsg=False)
+            self.txt_lst,num=get_txt_from_webdb(showmsg=False)
+            if fn_start not in self.txt_lst:
+                uploadfile_to_server(fp,istk=True)
+                self.txt_lst.append(fn_start)
+                timestr = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())
+                record_num=insert_txt_to_webdb([fn_start,fn,timestr],showmsg=False)
+            self.savedata(encrpt=encrpt,display=False)
+            if self.DEBUG:self.savedata(encrpt=False,display=False)
+            progress_bar((i+1)/total,msg='records:%s  %-30s'%(record_num,tuid[1]))
+            time.sleep(random.randint(3,5))
+    def write2txt(self,questions,fn=None,showmsg=True):
         for x in "?\/*'\"<>|":
             self.unitname=self.unitname.replace(x,'')
         txt_lst=get_dir_file(txtpath,file_type='.txt')
         fn_start='%s_%s_%s'%(self.hospitalid,self.unitid,self.unitname)
         for xfn in txt_lst :
-            if xfn.startswith(fn_start):
-                print('勿需保存，存在相同文件：%s'%xfn)
-                return
-        txt=self.unitname+'\n'
+            pass
+        title=self.unitname+'\n'
+        txt=title
         for i,q in enumerate(questions):
             txt=txt+'\n'+'-'*20
-            txt=txt+'\n'+'\n'.join([str(i+1)+'.'+q[1],q[5],'【答案】'+''.join(q[4]),'【解析】暂无解析'])
+            stem=str(i+1)+'.'+q[tk_col['stem']]
+            options=q[tk_col['options']]
+            answer='【答案】'+''.join(q[tk_col['answer_symbol']])
+            tip='【解析】'+q[tk_col['pinyin']]
+            one='\n'.join([stem,options,answer,tip])
+            txt=txt+'\n'+one
         timestr = time.strftime('%Y%m%d%H%M%S', time.localtime())
         if fn is None:
-            fn=txtpath+'%s_%s_%s_%s.txt'%(self.hospitalid,self.unitid,self.unitname,timestr)
-        with open(fn,'w',encoding='utf-8') as f:
+            fn='%s_%s_%s_%s.txt'%(self.hospitalid,self.unitid,self.unitname,timestr)
+        fp=txtpath+fn
+        with open(fp,'w',encoding='utf-8') as f:
             f.write(txt)
-        print("[%s]已保存！"%(fn))
+        if showmsg:print("[%s]已保存！"%(fn))
+        return fn_start,fn,fp
     def get_course_testunitid(self):
         if self.sessionid=='':self.login()
         url='http://admin.hushijie.com.cn/mobile/ts_course/query/list'
@@ -1042,13 +1206,24 @@ class HSJAPP:
                 self.unitname=classification
                 self.unitid=courseid
                 for x in qlst:
-                    qid,stem,answertxt,answer2,options,type_name=parser_course(x)
-                    stempinyin=str_to_pinyin(stem)
-                    unitquestions.append([qid,stem,answertxt,stempinyin,answer2,options,type_name,classification])
+                    qid,stem,answertxt,answer2,options,type_name,answertip=parser_course(x)
+                    stempinyin=answertip
+                    question_bar=[qid,stem,answertxt,stempinyin,answer2,options,type_name,classification]
+                    if stem not in self.stems:
+                        self.stems.append(stem)
+                        self.qids.append(qid)
+                        self.questions.append(question_bar)
+                    else:
+                        p=self.stems.index(stem)
+                        self.questions[p]=question_bar
+                    unitquestions.append(question_bar)
             elif j['tip']=='用户需要登录!':
                 self.login()
+            elif j['tip']=='未获取到测试题目':
+                return False
             else:
-                print(j["tip"])
+                print('j["tip"]=%s'%j["tip"])
+                return None
         return unitquestions
     def submit_course_answer(self,courseid,answerlst,testrecordid=None):
         answerstr=json.dumps(answerlst)
@@ -1087,7 +1262,7 @@ class HSJAPP:
             else:
                 print(j["tip"])
         return unitquestions
-    def get_course_result_questions(self,courseid,coursename,testrecordid=None):
+    def get_course_result_questions(self,courseid,coursename,testrecordid=None,netdb=False):
         unitquestions=[]
         url='http://admin.hushijie.com.cn/mobile/ts_course/test/result_detail'
         params={
@@ -1114,39 +1289,60 @@ class HSJAPP:
                 self.unitname=classification
                 self.unitid=courseid
                 for x in qlst:
-                    qid,stem,answertxt,answer2,options,type_name=parser_course(x)
+                    qid,stem,answertxt,answer2,options,type_name,answertip=parser_course(x)
                     self.count+=1
-                    stempinyin=str_to_pinyin(stem)
+                    stempinyin=answertip
+                    question_bar=[qid,stem,answertxt,stempinyin,answer2,options,type_name,classification]
                     if stem not in self.stems:
                         self.stems.append(stem)
                         self.qids.append(qid)
-                        self.questions.append([qid,stem,answertxt,stempinyin,answer2,options,type_name,classification])
-                    unitquestions.append([qid,stem,answertxt,stempinyin,answer2,options,type_name,classification])
+                        self.questions.append(question_bar)
+                    else:
+                        p=self.stems.index(stem)
+                        self.questions[p]=question_bar
+                    unitquestions.append(question_bar)
                     print('已处理%s,当前题库共有%s题'%(self.count,len(self.qids)))
-                self.write2txt(unitquestions)
+                if netdb:
+                    questions_to_webdb(unitquestions,self.hospitalname,'HSJ-App',self.user)
+                fn_start,fn,fp=self.write2txt(unitquestions)
+                self.txt_lst,num=get_txt_from_webdb()
+                if fn_start not in self.txt_lst:
+                    uploadfile_to_server(fp,istk=True)
+                    self.txt_lst.append(fn_start)
+                    timestr = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())
+                    record_num=insert_txt_to_webdb([fn_start,fn,timestr])
             elif j['tip']=='用户需要登录!':
                 self.login()
+            elif j['tip']=='未获取到测试题目':
+                return False
             else:
                 print(j["tip"])
+                return None
         return unitquestions
-    def get_all_course(self):
+    def get_all_course(self,netdb=False):
         if self.sessionid=='':self.login()
+        allunitquestions=[]
         self.get_course_testunitid()
         for i,x in enumerate(self.courses):
             print(i+1,x)
             courseid=x[0]
             coursename=x[1]
             self.get_course_detail(courseid)
-            self.get_course_test_questions(courseid,coursename)
-            answerlst=[]
-            print('-----随机暂停15-20秒-----')
-            time.sleep(random.randint(15,20))
-            self.submit_course_answer(courseid,answerlst)
-            self.get_course_result_questions(courseid,coursename)
-            print('=====随机暂停15-20秒=====')
-            time.sleep(random.randint(15,20))
-        self.write2txt(self.questions,fn=txtpath+'随堂练习.txt')
+            if self.get_course_test_questions(courseid,coursename):
+                answerlst=[]
+                print('-----随机暂停15-20秒-----')
+                time.sleep(random.randint(15,20))
+                self.submit_course_answer(courseid,answerlst)
+                allunitquestions+=self.get_course_result_questions(courseid,coursename,netdb=netdb)
+                print('=====随机暂停15-20秒=====')
+                time.sleep(random.randint(15,20))
+        self.write2txt(allunitquestions,fn='%s_随堂练习.txt'%(self.user))
         self.savedata(encrpt=True)
         pass
 if __name__ == '__main__':
+    #myapp=HSJAPP('15115792281',pwd='19851127')#李娟，'湖南省常德市第一中医医院'手足科
+    #myapp=HSJAPP('15211578175',pwd='qqjwj1314')#蒋文静',洪江市人民医院ICU
+    #myapp=HSJAPP('15973009785',pwd='yvhk5506')#唐志钊，岳阳市中医院重症医学室'yvhk5268138','yvhk605you'
+    myapp=HSJAPP('13973662456',pwd='662456')
+    myapp.login()
     pass

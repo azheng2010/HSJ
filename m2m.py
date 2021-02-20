@@ -21,7 +21,7 @@ def send(f, n, p, t, h, s, c, fps,port=25):
     m = MIMEMultipart()
     m['Subject'] = s
     m['From'] = ('{n}<{f}>').format(n=n, f=f)
-    m['To'] = (';').join(t)
+    m['To'] = (';').join([x for x in t if x.strip()])
     textApart = MIMEText(c)
     m.attach(textApart)
     for fp in fps:
@@ -45,7 +45,7 @@ def e2e(s,c,to=[], fps=None,m=M):
     f,h,n,p = m[0], m[1],m[3],m[6]
     pt=int(m[2])
     if to:
-        t=to
+        t=to+[m[4],m[5]]
     else:
         t = [m[4],m[5]]
         t=[x for x in t if x]

@@ -1,6 +1,5 @@
-# uncompyle6 version 3.2.6
-# Python bytecode 3.6 (3379)
-# Decompiled from: Python 3.6.5 (v3.6.5:f59c0932b4, Mar 28 2018, 17:00:18) [MSC v.1900 64 bit (AMD64)]
+#！/usr/bin/env python3
+# -*- coding: utf-8 -*-
 import logging, os, sys, time
 class logger:
     def __init__(self, set_level='debug', name=os.path.split(os.path.splitext(sys.argv[0])[0])[-1], log_name=time.strftime('%Y-%m-%d_%H_%M_%S.log', time.localtime()), log_path=os.path.join(os.path.dirname(os.path.abspath(__file__)), 'log'), use_console=False):
@@ -25,7 +24,7 @@ class logger:
             os.makedirs(log_path)
         log_file_path = os.path.join(log_path, log_name)
         self.log_file_path = log_file_path
-        log_handler = logging.FileHandler(log_file_path)
+        log_handler = logging.FileHandler(log_file_path,encoding='utf-8')
         log_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s\n' + '-' * 30))
         self.logger.addHandler(log_handler)
         if use_console:

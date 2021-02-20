@@ -20,15 +20,16 @@ if not os.path.exists(txtpath):os.makedirs(txtpath)
 if not os.path.exists(logpath):os.makedirs(logpath)
 if not os.path.exists(confpath):os.makedirs(confpath)
 global M
+global DBCONF
+global UPLOAD_URL
 global QUYjson
-version='0.3.5'
-logger_level='warning'#日志显示级别debug,info不会显示'debug'#
-tk_col = {'qid':0,
- 'stem':1,  'options':5,  'answer_txt':2,
- 'answer_symbol':4,  'pinyin':3,
- 'qtype':6,  'mark':7,}
-tiku_db_col = ['qid', 'stem', 'options', 'answer_txt', 'answer_symbol',
-               'parsing', 'qtype', 'company', 'origin', 'mark',]
+version='0.5.5'
+#logger_level='warning'#日志显示级别debug,info不会显示'debug'
+logger_level='DEBUG'
+tk_col = {'qid':0,'stem':1,'answer_txt':2,'pinyin':3,'answer_symbol':4,
+           'options':5,'qtype':6,'mark':7,}
+tiku_db_col = ['qid','qtype', 'stem', 'options', 'answer_txt', 'answer_symbol',
+               'solution', 'company', 'origin', 'mark',]
 app=MYAES()
 with open(confpath+'use.db','r') as f:
     txt=f.read().strip()
@@ -70,9 +71,12 @@ def pick_txt_answer(answer_lst, options_lst):
     for option in options_lst:
         for x in answer_lst:
             if option.startswith(x):
-                res = re.compile('(?<=^[A-S]\\s*[\\.、．]\\s*).*').search(option)
+                res = re.compile('(^[A-S]\\s*[\\.、．]\\s*).*').search(option)
+                res2 = re.compile('(^[A-S]\\s*[\\.、．]\\s*)').search(option)
                 if res:
                     answer_txt = res.group()
+                    symbol=res2.group()
+                    answer_txt=answer_txt.replace(symbol,'',1)
                 else:
                     answer_txt = option
                 answer_txt = answer_txt.strip()
@@ -237,7 +241,12 @@ def read_start_response(fdir=None, fname=None, makefile=False):
     if fname is None:
         fname = 'start_response.txt'
     fpath = fdir + fname
-    with open(fpath, mode='r', encoding='utf-8') as (f):
+    if not os.path.exists(fpath):
+        print('考题文件不存在!')
+        if not makefile:
+            return (None, None)
+        return None
+    with open(fpath, mode='r', encoding='utf-8') as f:
         t = f.read()
     j = json.loads(t, encoding='utf-8')
     if j['examPaperFullInfo']:
@@ -279,24 +288,33 @@ def delete_start_response(fdir=None, fname=None):
     else:
         print("%s文件不存在！！"%fpath)
 def symb_options(options):
-    symbols = 'ABCDEFGHIJKL'
+    symbols = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
     symboptions = [symbols[iy] + '. ' + y for iy, y in enumerate(options)]
     return symboptions
 def parser(questionRelation):
-    typedic={1:'单选',2:'多选',3:'判断',}
     x=questionRelation
     qid=x["questionid"]
     stem=x['question']['stem']
+    desc=''
+    if x['question'].get('caseid'):
+        desc=x['question']['caseAnalysis']['desc']
+    stem=desc+stem
+    answertip=x['question'].get('answertip')
     optionlst=x['question']['questionOptionList']
     qtype=x['question']['questiontype']
+    qtypename=x['question'].get('questionTypeName')
     answerNodic={1:'A',2:'B',3:'C',4:'D',5:'E',6:'F',7:'G',
                  8:'H',9:'I',10:'J',11:'K',12:'L',13:'M',
-                 14:'N',15:'O',16:'P',17:'Q',18:'R',19:'S'}
+                 14:'N',15:'O',16:'P',17:'Q',18:'R',19:'S',
+                 20:'T',21:'U',22:'V',23:'W',24:'X',25:'Y',26:'Z',}
     answertxt=[]
     answer2=[]
     options_dic={}
     for y in optionlst:
-        options_dic[y["questionNo"]]=answerNodic[y["questionNo"]]+'. '+y['optionCont']
+        try:
+            options_dic[y["questionNo"]]=answerNodic[y["questionNo"]]+'. '+y['optionCont']
+        except:
+            print(optionlst)
         if y['answer']==True and qtype==1:
             answertxt.append(y['optionCont'])
             answer2.append(answerNodic[y["questionNo"]])
@@ -310,15 +328,20 @@ def parser(questionRelation):
     p=list(options_dic.keys())
     p.sort()
     options='\n'.join([options_dic[z] for z in p])
-    type_name=typedic[qtype]
-    return qid,stem,answertxt,answer2,options,type_name
+    type_name=qtypename
+    return qid,stem,answertxt,answer2,options,type_name,answertip
 def parser_course(testQuestionList):
-    typedic={1:'单选',2:'多选',3:'判断',}
     x=testQuestionList
     qid=x["questionId"]
     stem=x['question']['stem']
+    desc=''
+    if x['question'].get('caseid'):
+        desc=x['question']['caseAnalysis']['desc']
+    stem=desc+stem
+    answertip=x['question'].get('answertip')
     optionlst=x['question']['questionOptionList']
     qtype=x['question']['questiontype']
+    qtypename=x['question'].get('questionTypeName')
     answerNodic={1:'A',2:'B',3:'C',4:'D',5:'E',6:'F',7:'G',
                  8:'H',9:'I',10:'J',11:'K',12:'L',13:'M',
                  14:'N',15:'O',16:'P',17:'Q',18:'R',19:'S'}
@@ -340,24 +363,42 @@ def parser_course(testQuestionList):
     p=list(options_dic.keys())
     p.sort()
     options='\n'.join([options_dic[z] for z in p])
-    type_name=typedic[qtype]
-    return qid,stem,answertxt,answer2,options,type_name
-def parser_login(account):
+    type_name=qtypename
+    return qid,stem,answertxt,answer2,options,type_name,answertip
+def parser_login(account,cn=True):
     dic={}
-    dic["姓名"]=account["realname"]
-    dic["性别"]=account["sexName"]
-    dic["电话"]=account["phone"]
-    dic["工号"]=account["workid"]
-    dic["职称"]=account["professionalTitleName"]
-    dic["职业"]=account["jobName"]
-    dic["最高学历"]=account["maxEducationName"]
-    dic["所属部门"]=account["departmentName"]
-    dic["所属医院名称"]=account["hospitalName"]
-    dic["编制特性"]=account["staffPropertyName"]
-    dic["医院代码"]=account["hospitalId"]
-    dic["护士等级"]=account["nurseLevelName"]
-    dic["是否部门主管"]=account["departmentManeger"]
-    dic["是否医院主管"]=account["hospitalManager"]
+    if cn:
+        dic["姓名"]=account["realname"]
+        dic["性别"]=account["sexName"]
+        dic["电话"]=account["phone"]
+        dic["工号"]=account["workid"]
+        dic["职称"]=account["professionalTitleName"]
+        dic["职业"]=account["jobName"]
+        dic["最高学历"]=account["maxEducationName"]
+        dic["所属部门"]=account["departmentName"]
+        dic["所属医院名称"]=account["hospitalName"]
+        dic["编制特性"]=account["staffPropertyName"]
+        dic["医院代码"]=account["hospitalId"]
+        dic["护士等级"]=account["nurseLevelName"]
+        dic["是否部门主管"]=account["departmentManeger"]
+        dic["是否医院主管"]=account["hospitalManager"]
+    else:
+        dic["name"]=account.get("realname")
+        dic["sex"]=account.get("sexName")
+        dic["phone"]=account.get("phone")
+        dic["workid"]=account.get("workid")
+        dic["professionalTitle"]=account.get("professionalTitleName")
+        dic["job"]=account.get("jobName")
+        dic["maxEducation"]=account.get("maxEducationName")
+        dic["departmentName"]=account.get("departmentName")
+        dic["departmentId"]=account.get("departmentId")
+        dic["hospitalName"]=account.get("hospitalName")
+        dic["staffProperty"]=account.get("staffPropertyName")
+        dic["hospitalId"]=account.get("hospitalId")
+        dic["nurseLevel"]=account.get("nurseLevelName")
+        dic["departmentManeger"]="Y" if account.get("departmentManeger") else "N"
+        dic["hospitalManager"]="Y" if account.get("hospitalManager") else "N"
+        dic["usernameid"]=account.get("username")
     return dic
 def read_commit_answer(fn=None, txt=None):
     if txt is None:
@@ -379,6 +420,7 @@ def pick_ua(ua):
     m=re.search(re_s,ua,re.S)
     if m:
         out=m.group()
+        out=';'.join([x for x in out[1:-1].split(sep='; ') if x not in ['U','wv']])
         print(out)
         return out
 def str_to_pinyin(txt):
@@ -436,6 +478,27 @@ def get_email_data():
                      de.decrypt(x[5]),de.decrypt(x[6]),
                      de.decrypt(x[7])] for i,x in enumerate(lst) if i>0]
     return data_lst[1]
+def get_webdb_conf():
+    try:
+        r = requests.get(urls["giteewebdb"])
+    except:
+        r = requests.get(urls["githubwebdb"])
+    if r.status_code == 200:
+        txt = r.text
+        de=MYAES()
+        jsontxt =de.decrypt(txt)
+        dic=json.loads(jsontxt,encoding='utf-8')
+        dbuser=dic["user"]
+        dbpwd=dic["pwd"]
+        host=dic["host"]
+        port=dic["port"]
+        dbname=dic["dbname"]
+        tablename=dic["tablename"]
+        uploadtxturl=dic.get("uploadtxturl")
+        uploadurl=dic.get("uploadurl")
+        return (dbuser,dbpwd,host,port,dbname,tablename),(uploadtxturl,uploadurl)
+    print('无法获取网络数据库连接配置信息！！')
+    return None,None,None,None,None,None,None,None
 def get_qiniu_conf():
     try:
         r = requests.get(urls["giteeqny"])
@@ -447,7 +510,69 @@ def get_qiniu_conf():
         for k in j.keys():
             j[k]=de.decrypt(j[k])
         return j
+def txtanswer_to_formatanswer(exam_lst,minianswertxt_lst):
+    txt_all_answer_lst=[]
+    len_txt=len(minianswertxt_lst)
+    len_exam=len(exam_lst)
+    if len_txt>len_exam:
+        print('远程答案文本＞考题列表，是不是出错了？')
+    for i,at in enumerate(minianswertxt_lst):
+        if i>len_exam-1:
+            break
+        ex=exam_lst[i]
+        qid=ex["questionid"]
+        answer_abcd=at.strip().split(sep=']')[-1]
+        ops_dic={'A':0,'B':1,'C':2,'D':3,'E':4,'F':5,'G':6,'H':7,'I':8,'J':9,'K':10}
+        index_lst=[ops_dic[a] for a in answer_abcd]
+        ex_ops=ex['question']['questionOptionList']
+        answer_lst=[ex_ops[p]["questionNo"] for p in index_lst]
+        dic = {}
+        dic['questionid'] = qid
+        dic['type'] = 1
+        dic['answers'] = answer_lst
+        txt_all_answer_lst.append(dic)
+    return txt_all_answer_lst
+def get_remote_txt(fn):
+    print('='*20)
+    print(urls['giteetxtanswer']+fn)
+    try:
+        r=requests.get(urls['giteetxtanswer']+fn)
+    except:
+        r=requests.get(urls['githubtxtanswer']+fn)
+    if r.status_code==404:
+        return None
+    elif r.status_code==200:
+        return r.text
+def get_py_pyc():
+    try:
+        r=requests.get(urls["giteepypyc"])
+    except:
+        r=requests.get(urls["githubpypyc"])
+    if r.status_code==200:
+        j=r.json()
+        return j
+def uploadfile_to_server(fp,istk=False):
+    uploadtxturl,uploadurl=UPLOAD_URL
+    if istk:
+        url=uploadtxturl
+    else:
+        url=uploadurl
+    if not os.path.exists(fp):return
+    files={'file':open(fp,'rb')}
+    try:
+        r=requests.post(url,files=files)
+        if r.status_code==200:
+            return r.json()
+    except:
+        pass
+def progress_bar(rate,style='#',padding='-',total=25,msg=''):
+    if rate>1:rate=1
+    bar=int(rate*total)*style+padding*total
+    bar=bar[:total]
+    out='\r[%s]%3s%% %s'%(bar,int(rate*100),msg)
+    print(out,end='')
 M=get_email_data()
+DBCONF,UPLOAD_URL=get_webdb_conf()
 QNYjson=get_qiniu_conf()
 if __name__ == '__main__':
     pass

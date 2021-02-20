@@ -5,7 +5,7 @@ import os
 import requests
 import shutil
 import platform
-from comm import urls,path0,confpath
+from comm import urls,path0,confpath,get_py_pyc
 import zipfile
 from configparser import ConfigParser
 def downloadzipfile(localpath):
@@ -36,28 +36,42 @@ def update():
                             unpack_dir=os.path.join(unpack_dir,'HSJ'),
                             zipdir=os.path.dirname(zp))
                 os.remove(zp)
-                updater_py_file(unpack_dir+'HSJ',path0,file_type='.py')
+                updater_py_file(unpack_dir+'HSJ',path0)
                 updater_conf_file(os.path.realpath(unpack_dir+'HSJ/conf'),
                                   os.path.realpath(confpath))
+                overwritemain(confpath+'default.ini',path0+'main.py')
             elif os.path.basename(zp)=='HSJ-master.zip':
                 unzip_file(zp, unpack_dir)
                 os.remove(zp)
-                updater_py_file(unpack_dir+'HSJ-master',path0,file_type='.py')
+                updater_py_file(unpack_dir+'HSJ-master',path0)
                 updater_conf_file(os.path.realpath(unpack_dir+'HSJ-master/conf'),
                                   os.path.realpath(confpath))
+                overwritemain(confpath+'default.ini',path0+'main.py')
             else:
                 print('无法更新')
                 return
             print("脚本更新成功，请关闭软件后重新进入！")
-def updater_py_file(new_src,old_dst,file_type='.py'):
-    lst=filter_file_type(new_src,file_type=file_type)
+    if platform.system()=='Windows':
+        print('Windows系统下暂时无法更新！')
+def updater_py_file(new_src,old_dst):
+    lst=filter_file_type(new_src,file_type='.py')
     if lst:
         for x in lst:
             newfp=os.path.join(new_src,x)
             oldfp=os.path.join(old_dst,x)
             shutil.copyfile(newfp,oldfp,follow_symlinks=False)
             print('%16s updated'%x)
-    print('py文件更新完毕')
+    lst2=filter_file_type(new_src,file_type='.pyc')
+    if lst2:
+        for x2 in lst2:
+            newfp=os.path.join(new_src,x2)
+            oldfp=os.path.join(old_dst,x2)
+            shutil.copyfile(newfp,oldfp,follow_symlinks=False)
+            print('%16s updated'%x2)
+            if os.path.exists(oldfp[:-1]):
+                os.remove(oldfp[:-1])
+                print('%16s deleted'%x2[:-1])
+    print('py文件和pyc文件更新完毕！！')
 def updater_conf_file(new_src,old_dst):
     lst=filter_file_type(new_src,file_type=None)
     if lst:
@@ -127,5 +141,30 @@ def overwriteconf(oldfn,newfn):
         conf.set(data[0],data[1],data[2])
     with open(newfn,'w',encoding='utf-8') as f:
         conf.write(f)
+def overwritemain(conf_fn,main_fn):
+    conf = ConfigParser()
+    conf.read(conf_fn,encoding='utf-8')
+    user=conf.get('UserInf','user')
+    pwd=conf.get('UserInf','password')
+    limit9=conf.get('Correctrate-Setting','max')
+    limit0=conf.get('Correctrate-Setting','min')
+    with open(main_fn,'r',encoding='utf-8') as f:
+        lines=f.readlines()
+    for i,line in enumerate(lines):
+        if "user=" in line:
+            lst=line.split(sep='user=')
+            lst[-1]="user='%s'#修改时保留单引号\n"%user
+            lines[i]=''.join(lst)
+        if "pwd=" in line:
+            lst=line.split(sep='pwd=')
+            lst[-1]="pwd='%s'#单引号保留\n"%pwd
+            lines[i]=''.join(lst)
+        if "rate_min,rate_max=" in line:
+            lst=line.split(sep='rate_min,rate_max=')
+            lst[-1]="rate_min,rate_max=(%s , %s)#正确率区间(百分比)\n"%(limit0,limit9)
+            lines[i]=''.join(lst)
+    with open(main_fn,'w',encoding='utf-8') as f2:
+        f2.write(''.join(lines))
+    print("main.py更新完毕!!")
 if __name__=="__main__":
     pass
